@@ -40,7 +40,7 @@ class Model:
         if len(parts) == 5:
             game, dest, spec, rev, version = parts
             if version == "DJHACKERS":  # Fucking old crack
-                version = 0
+                version = '0'
             return Model(game, dest, spec, rev, int(version))
         elif len(parts) == 4:
             game, dest, spec, rev = parts

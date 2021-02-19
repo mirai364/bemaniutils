@@ -154,6 +154,7 @@ class JubeatGamendRegisterHandler(JubeatBase):
         # Respond to request with nothing since we don't care about cardless players
         return Node.void('gameend')
 
+
 class JubeatGametopGetMeetingHandler(JubeatBase):
 
     def handle_gametop_get_meeting_request(self, request: Node) -> Node:
