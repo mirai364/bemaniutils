@@ -14,6 +14,10 @@ set -e
 ./read --series pnm --version 24 "$@"
 ./read --series pnm --version 25 "$@"
 
+# Init Pop'n Omnimix
+./read --series pnm --version omni-24 "$@"
+./read --series pnm --version omni-25 "$@"
+
 # Init Jubeat
 ./read --series jubeat --version saucer "$@"
 ./read --series jubeat --version saucer-fulfill "$@"
