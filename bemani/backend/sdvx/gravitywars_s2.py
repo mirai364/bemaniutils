@@ -3840,7 +3840,7 @@ class SoundVoltexGravityWarsSeason2(
         game = Node.void('game_3')
 
         # First, grab hit chart
-        playcounts = self.data.local.music.get_hit_chart(self.game, self.version, 1024)
+        playcounts = self.data.local.music.get_hit_chart(self.game, self.music_version, 1024)
 
         hitchart = Node.void('hit')
         game.add_child(hitchart)
@@ -3851,7 +3851,7 @@ class SoundVoltexGravityWarsSeason2(
             info.add_child(Node.u32('cnt', count))
 
         # Now, grab global and local scores as well as clear rates
-        global_records = self.data.remote.music.get_all_records(self.game, self.version)
+        global_records = self.data.remote.music.get_all_records(self.game, self.music_version)
         users = {
             uid: prof for (uid, prof) in self.data.local.user.get_all_profiles(self.game, self.version)
         }
@@ -3859,7 +3859,7 @@ class SoundVoltexGravityWarsSeason2(
             uid for uid in users
             if users[uid].get_int('loc', -1) == locid
         ]
-        area_records = self.data.local.music.get_all_records(self.game, self.version, userlist=area_users)
+        area_records = self.data.local.music.get_all_records(self.game, self.music_version, userlist=area_users)
         clears = self.get_clear_rates()
         records: Dict[int, Dict[int, Dict[str, Tuple[UserID, Score]]]] = {}
 
@@ -3945,7 +3945,7 @@ class SoundVoltexGravityWarsSeason2(
                 rival.add_child(Node.string('name', other_profile.get_str('name')))
 
                 # Return scores for this user on random charts
-                scores = self.data.remote.music.get_scores(self.game, self.version, link.other_userid)
+                scores = self.data.remote.music.get_scores(self.game, self.music_version, link.other_userid)
                 for score in scores:
                     music = Node.void('music')
                     rival.add_child(music)
@@ -4028,7 +4028,7 @@ class SoundVoltexGravityWarsSeason2(
 
         if game_config.get_bool('force_unlock_songs'):
             ids: Dict[int, int] = {}
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.id not in ids:
                     ids[song.id] = 0

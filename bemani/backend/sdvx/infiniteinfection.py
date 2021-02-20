@@ -1868,7 +1868,7 @@ class SoundVoltexInfiniteInfection(
         game_config = self.get_game_config()
         if game_config.get_bool('force_unlock_songs'):
             ids = set()
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.data.get_int('limited') in (self.GAME_LIMITED_LOCKED, self.GAME_LIMITED_UNLOCKABLE):
                     ids.add((song.id, song.chart))
@@ -1964,7 +1964,7 @@ class SoundVoltexInfiniteInfection(
         game = Node.void('game_2')
 
         # First, grab hit chart
-        playcounts = self.data.local.music.get_hit_chart(self.game, self.version, 1024)
+        playcounts = self.data.local.music.get_hit_chart(self.game, self.music_version, 1024)
 
         hitchart = Node.void('hitchart')
         game.add_child(hitchart)
@@ -1975,7 +1975,7 @@ class SoundVoltexInfiniteInfection(
             info.add_child(Node.u32('cnt', count))
 
         # Now, grab user records
-        records = self.data.remote.music.get_all_records(self.game, self.version)
+        records = self.data.remote.music.get_all_records(self.game, self.music_version)
         missing_users = [userid for (userid, _) in records]
         users = {userid: profile for (userid, profile) in self.get_any_profiles(missing_users)}
 
@@ -2004,7 +2004,7 @@ class SoundVoltexInfiniteInfection(
             uid for (uid, prof) in self.data.local.user.get_all_profiles(self.game, self.version)
             if prof.get_int('loc', -1) == locid
         ]
-        records = self.data.local.music.get_all_records(self.game, self.version, userlist=area_users)
+        records = self.data.local.music.get_all_records(self.game, self.music_version, userlist=area_users)
         missing_users = [userid for (userid, _) in records if userid not in users]
         for (userid, profile) in self.get_any_profiles(missing_users):
             users[userid] = profile
@@ -2117,7 +2117,7 @@ class SoundVoltexInfiniteInfection(
             userid = None
 
         if userid is not None:
-            scores = self.data.remote.music.get_scores(self.game, self.version, userid)
+            scores = self.data.remote.music.get_scores(self.game, self.music_version, userid)
         else:
             scores = []
 
@@ -2361,7 +2361,7 @@ class SoundVoltexInfiniteInfection(
 
         if game_config.get_bool('force_unlock_songs'):
             ids: Dict[int, int] = {}
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.id not in ids:
                     ids[song.id] = 0

@@ -30,6 +30,7 @@ class SoundVoltexFrontend(FrontendBase):
 
     def all_games(self) -> Iterator[Tuple[str, int, str]]:
         yield from SoundVoltexFactory.all_games()
+        yield (GameConstants.SDVX, 10005, 'SDVX PLUS')  # Folder for voltex customs
 
     def format_score(self, userid: UserID, score: Score) -> Dict[str, Any]:
         formatted_score = super().format_score(userid, score)
@@ -104,6 +105,6 @@ class SoundVoltexFrontend(FrontendBase):
         if existing['difficulties'][new.chart] == 0:
             new_song['difficulties'][new.chart] = new.data.get_int('difficulty', 21)
         # Set the category to the earliest seen version of this song
-        if existing['category'] > new.version:
+        if existing['category'] == 0:
             new_song['category'] = new.version
         return new_song

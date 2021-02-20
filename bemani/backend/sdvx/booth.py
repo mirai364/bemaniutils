@@ -152,7 +152,7 @@ class SoundVoltexBooth(
         game_config = self.get_game_config()
         if game_config.get_bool('force_unlock_songs'):
             ids = set()
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.data.get_int('limited') == self.GAME_LIMITED_LOCKED:
                     ids.add(song.id)
@@ -215,7 +215,7 @@ class SoundVoltexBooth(
         game.add_child(hiscore)
         hiscore.set_attribute('type', '1')
 
-        records = self.data.remote.music.get_all_records(self.game, self.version)
+        records = self.data.remote.music.get_all_records(self.game, self.music_version)
 
         # Organize by song->chart
         records_by_id: Dict[int, Dict[int, Tuple[UserID, Score]]] = {}

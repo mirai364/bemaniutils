@@ -68,6 +68,7 @@ class CatalogObject(BaseObject):
             'bpm_min': song.data.get_int('bpm_min'),
             'bpm_max': song.data.get_int('bpm_max'),
             'limited': song.data.get_int('limited'),
+            'chart_id': song.data.get_str('chart_id'),
         }
 
     def __format_song(self, song: Song) -> Dict[str, Any]:

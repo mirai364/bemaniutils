@@ -3253,7 +3253,7 @@ class SoundVoltexVividWave(
         game_config = self.get_game_config()
         if game_config.get_bool('force_unlock_songs'):
             ids = set()
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.data.get_int('limited') in (self.GAME_LIMITED_LOCKED, self.GAME_LIMITED_UNLOCKABLE):
                     ids.add((song.id, song.chart))
@@ -3418,7 +3418,7 @@ class SoundVoltexVividWave(
         game = Node.void('game')
 
         # Now, grab global and local scores as well as clear rates
-        global_records = self.data.remote.music.get_all_records(self.game, self.version)
+        global_records = self.data.remote.music.get_all_records(self.game, self.music_version)
         users = {
             uid: prof for (uid, prof) in self.data.local.user.get_all_profiles(self.game, self.version)
         }
@@ -3426,7 +3426,7 @@ class SoundVoltexVividWave(
             uid for uid in users
             if users[uid].get_int('loc', -1) == locid
         ]
-        area_records = self.data.local.music.get_all_records(self.game, self.version, userlist=area_users)
+        area_records = self.data.local.music.get_all_records(self.game, self.music_version, userlist=area_users)
         clears = self.get_clear_rates()
         records: Dict[int, Dict[int, Dict[str, Tuple[UserID, Score]]]] = {}
 
@@ -3539,7 +3539,7 @@ class SoundVoltexVividWave(
             userid = None
 
         if userid is not None:
-            scores = self.data.remote.music.get_scores(self.game, self.version, userid)
+            scores = self.data.remote.music.get_scores(self.game, self.music_version, userid)
         else:
             scores = []
 
@@ -3613,7 +3613,7 @@ class SoundVoltexVividWave(
                 index = index + 1
 
                 # Return scores for this user on random charts
-                scores = self.data.remote.music.get_scores(self.game, self.version, link.other_userid)
+                scores = self.data.remote.music.get_scores(self.game, self.music_version, link.other_userid)
                 for score in scores:
                     music = Node.void('music')
                     rival.add_child(music)
@@ -3929,7 +3929,7 @@ class SoundVoltexVividWave(
 
         if game_config.get_bool('force_unlock_songs'):
             ids: Dict[int, int] = {}
-            songs = self.data.local.music.get_all_songs(self.game, self.version)
+            songs = self.data.local.music.get_all_songs(self.game, self.music_version)
             for song in songs:
                 if song.id not in ids:
                     ids[song.id] = 0

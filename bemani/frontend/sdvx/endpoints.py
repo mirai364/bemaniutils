@@ -176,24 +176,19 @@ def listrecords(userid: UserID) -> Dict[str, Any]:
 def viewtopscores(musicid: int) -> Response:
     # We just want to find the latest mix that this song exists in
     frontend = SoundVoltexFrontend(g.data, g.config, g.cache)
-    versions = sorted(
-        [version for (game, version, name) in frontend.all_games()],
-        reverse=True,
-    )
     name = None
     artist = None
     difficulties = [0, 0, 0, 0, 0]
 
-    for version in versions:
-        for chart in [0, 1, 2, 3, 4]:
-            details = g.data.local.music.get_song(GameConstants.SDVX, version, musicid, chart)
-            if details is not None:
-                if name is None:
-                    name = details.name
-                if artist is None:
-                    artist = details.artist
-                if difficulties[chart] == 0:
-                    difficulties[chart] = details.data.get_int('difficulty')
+    for chart in [0, 1, 2, 3, 4]:
+        details = g.data.local.music.get_song(GameConstants.SDVX, 0, musicid, chart)
+        if details is not None:
+            if name is None:
+                name = details.name
+            if artist is None:
+                artist = details.artist
+            if difficulties[chart] == 0:
+                difficulties[chart] = details.data.get_int('difficulty')
 
     if name is None:
         # Not a real song!

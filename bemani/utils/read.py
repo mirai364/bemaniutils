@@ -3283,17 +3283,20 @@ class ImportSDVX(ImportBase):
         update: bool,
     ) -> None:
         actual_version = {
+            'all': None,
             '1': VersionConstants.SDVX_BOOTH,
             '2': VersionConstants.SDVX_INFINITE_INFECTION,
             '3': VersionConstants.SDVX_GRAVITY_WARS,
             '4': VersionConstants.SDVX_HEAVENLY_HAVEN,
             '5': VersionConstants.SDVX_VIVID_WAVE,
+            # Voltex doesn't have a real omnimix due to so few removals. But it does have a cool modpack
+            'plus-5': VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP,
         }.get(version, -1)
         if actual_version == VersionConstants.SDVX_BOOTH:
             self.charts = [0, 1, 2]
         elif actual_version in [VersionConstants.SDVX_INFINITE_INFECTION, VersionConstants.SDVX_GRAVITY_WARS]:
             self.charts = [0, 1, 2, 3]
-        elif actual_version == VersionConstants.SDVX_HEAVENLY_HAVEN or actual_version == VersionConstants.SDVX_VIVID_WAVE:
+        elif actual_version in [None, VersionConstants.SDVX_HEAVENLY_HAVEN, VersionConstants.SDVX_VIVID_WAVE, VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP]:
             self.charts = [0, 1, 2, 3, 4]
         else:
             raise Exception("Unsupported SDVX version, expected one of the following: 1, 2, 3, 4, 5!")
@@ -3410,7 +3413,7 @@ class ImportSDVX(ImportBase):
             bytedata = fp.read()
             strdata = bytedata.decode('shift_jisx0213', errors='replace')
         root = ET.fromstring(strdata)
-
+        game_version = self.version if self.version < 10000 else self.version - 10000
         for music_entry in root.findall('music'):
             # Grab the ID
             songid = int(music_entry.attrib['id'])
@@ -3418,10 +3421,11 @@ class ImportSDVX(ImportBase):
             artist = None
             bpm_min = None
             bpm_max = None
+            filename = None
             limited = [0, 0, 0, 0, 0]
             difficulties = [0, 0, 0, 0, 0]
 
-            if self.version == VersionConstants.SDVX_BOOTH:
+            if game_version == VersionConstants.SDVX_BOOTH:
                 # Find normal info about the song
                 for info in music_entry.findall('info'):
                     if info.attrib['attr'] == 'title_yomigana':
@@ -3434,6 +3438,8 @@ class ImportSDVX(ImportBase):
                         bpm_max = float(info.text)
                     if info.attrib['attr'] == 'limited':
                         limited = [int(info.text), int(info.text), int(info.text), int(info.text)]
+                    if info.attrib['attr'] == 'ascii':
+                        filename = info.text
                 # Make sure we got everything
                 if title is None or artist is None or bpm_min is None or bpm_max is None:
                     raise Exception(f'Couldn\'t parse info for song {songid}')
@@ -3450,11 +3456,12 @@ class ImportSDVX(ImportBase):
                         continue
 
                     difficulties[offset] = int(difficulty.find('difnum').text)
-            elif self.version in [VersionConstants.SDVX_INFINITE_INFECTION, VersionConstants.SDVX_GRAVITY_WARS]:
+            elif game_version in [VersionConstants.SDVX_INFINITE_INFECTION, VersionConstants.SDVX_GRAVITY_WARS]:
                 # Find normal info about the song
                 info = music_entry.find('info')
                 title = info.find('title_name').text
                 artist = info.find('artist_name').text
+                filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
 
@@ -3472,11 +3479,12 @@ class ImportSDVX(ImportBase):
 
                     difficulties[offset] = int(difficulty.find('difnum').text)
                     limited[offset] = int(difficulty.find('limited').text)
-            elif self.version == VersionConstants.SDVX_HEAVENLY_HAVEN or self.version == VersionConstants.SDVX_VIVID_WAVE:
+            elif game_version in [VersionConstants.SDVX_HEAVENLY_HAVEN, VersionConstants.SDVX_VIVID_WAVE]:
                 # Find normal info about the song
                 info = music_entry.find('info')
                 title = info.find('title_name').text
                 artist = info.find('artist_name').text
+                filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
 
@@ -3509,6 +3517,16 @@ class ImportSDVX(ImportBase):
                 '曩': 'è',
                 '䧺': 'ê',
                 '骭': 'ü',
+                '隍': 'Ü',
+                '雋': 'Ǜ',
+                '魄': '♃',
+                # '鬻': '♃', Somehow also correct depending on python version ????
+                '鬥': 'Ã',
+                '鬆': 'Ý',
+                '鬮': '¡',
+                '龕': '€',
+                '蹙': 'ℱ',
+                '頽': 'ä',
             }
 
             for orig, rep in accent_lut.items():
@@ -3518,8 +3536,11 @@ class ImportSDVX(ImportBase):
             # Import it
             self.start_batch()
             for chart in self.charts:
-                # First, try to find in the DB from another version
-                old_id = self.get_music_id_for_song(songid, chart)
+                # SDVX plus modpack has songids starting at 1 so it overlaps officials. This
+                # causes us to have to use a similar solution to ReflecBeat and DDR. Thankfully, the musicdb
+                # provides an ascii identifier for every song to differentiate between songs without using the songids.
+                # So use that to check.
+                old_id = self.get_music_id_for_song_data(None, None, f'{songid}_{filename}', chart, version=0)
                 if self.no_combine or old_id is None:
                     # Insert original
                     print(f"New entry for {songid} chart {chart}")
@@ -3528,12 +3549,49 @@ class ImportSDVX(ImportBase):
                     # Insert pointing at same ID so scores transfer
                     print(f"Reused entry for {songid} chart {chart}")
                     next_id = old_id
+                if old_id is None:
+                    # Add virtual music entry
+                    self.insert_music_id_for_song(
+                        next_id,
+                        self.version * 10000 + songid,
+                        chart,
+                        title,
+                        artist,
+                        f'{songid}_{filename}',
+                        {
+                            'limited': limited[chart],
+                            'difficulty': difficulties[chart],
+                            'bpm_min': bpm_min,
+                            'bpm_max': bpm_max,
+                            'chart_id': filename,
+                        },
+                        version=0,
+                    )
+                else:
+                    if self.update:
+                        self.update_metadata_for_music_id(
+                            old_id,
+                            title,
+                            artist,
+                            f'{songid}_{filename}',
+                            {
+                                'limited': limited[chart],
+                                'difficulty': difficulties[chart],
+                                'bpm_min': bpm_min,
+                                'bpm_max': bpm_max,
+                                'chart_id': filename,
+                            },
+                            version=0,
+                        )
+
                 data = {
                     'limited': limited[chart],
                     'difficulty': difficulties[chart],
                     'bpm_min': bpm_min,
                     'bpm_max': bpm_max,
+                    'chart_id': filename,
                 }
+                # Add normal entry for this song
                 self.insert_music_id_for_song(next_id, songid, chart, title, artist, None, data)
             self.finish_batch()
 
@@ -3579,7 +3637,7 @@ class ImportSDVX(ImportBase):
         for _, songs in music_lut.items():
             self.start_batch()
             for _, song in songs.items():
-                old_id = self.get_music_id_for_song(song.id, song.chart)
+                old_id = self.get_music_id_for_song_data(None, None, song.genre, song.chart, version=0)
                 if self.no_combine or old_id is None:
                     # Insert original
                     print(f"New entry for {song.id} chart {song.chart}")
@@ -3588,11 +3646,46 @@ class ImportSDVX(ImportBase):
                     # Insert pointing at same ID so scores transfer
                     print(f"Reused entry for {song.id} chart {song.chart}")
                     next_id = old_id
+                if old_id is None:
+                    # Add virtual music entry
+                    self.insert_music_id_for_song(
+                        next_id,
+                        self.version * 10000 + song.id,
+                        song.chart,
+                        song.name,
+                        song.artist,
+                        song.genre,
+                        {
+                            'limited': song.data.get_int('limited'),
+                            'difficulty': song.data.get_int('difficulty'),
+                            'bpm_min': song.data.get_int('bpm_min'),
+                            'bpm_max': song.data.get_int('bpm_max'),
+                            'chart_id': song.data.get_str('chart_id'),
+                        },
+                        version=0,
+                    )
+                else:
+                    if self.update:
+                        self.update_metadata_for_music_id(
+                            old_id,
+                            song.name,
+                            song.artist,
+                            song.genre,
+                            {
+                                'limited': song.data.get_int('limited'),
+                                'difficulty': song.data.get_int('difficulty'),
+                                'bpm_min': song.data.get_int('bpm_min'),
+                                'bpm_max': song.data.get_int('bpm_max'),
+                                'chart_id': song.data.get_str('chart_id'),
+                            },
+                            version=0,
+                        )
                 data = {
                     'limited': song.data.get_int('limited'),
                     'difficulty': song.data.get_int('difficulty'),
                     'bpm_min': song.data.get_int('bpm_min'),
                     'bpm_max': song.data.get_int('bpm_max'),
+                    'chart_id': song.data.get_str('chart_id'),
                 }
                 self.insert_music_id_for_song(next_id, song.id, song.chart, song.name, song.artist, None, data)
             self.finish_batch()
@@ -3620,6 +3713,10 @@ class ImportSDVX(ImportBase):
                     },
                 )
         self.finish_batch()
+
+    def populate_webui(self) -> None:
+        songs = MusicData.get_all_songs(GameConstants.SDVX)
+        print("hihihihi")
 
 
 class ImportMuseca(ImportBase):
@@ -4335,21 +4432,26 @@ if __name__ == "__main__":
 
     elif args.series == GameConstants.SDVX:
         sdvx = ImportSDVX(config, args.version, args.no_combine, args.update)
-        if args.server and args.token:
-            sdvx.import_from_server(args.server, args.token)
+        # Special case for sdvx. Since webui was previously using the "actual" songid,
+        # we have to backpopulate all the entries and I didn't want to write a db migration.
+        if args.version == 'all':
+            sdvx.populate_webui()
         else:
-            if args.xml is None and args.bin is None and args.csv is None:
-                raise Exception(
-                    'No XML file or game DLL or appeal card CSV provided and ' +
-                    'no remote server specified! Please provide either a --xml, ' +
-                    '--bin, --csv or a --server and --token option!'
-                )
-            if args.xml is not None:
-                sdvx.import_music_db_or_appeal_cards(args.xml)
-            if args.bin is not None:
-                sdvx.import_catalog(args.bin)
-            if args.csv is not None:
-                sdvx.import_appeal_cards(args.csv)
+            if args.server and args.token:
+                sdvx.import_from_server(args.server, args.token)
+            else:
+                if args.xml is None and args.bin is None and args.csv is None:
+                    raise Exception(
+                        'No XML file or game DLL or appeal card CSV provided and ' +
+                        'no remote server specified! Please provide either a --xml, ' +
+                        '--bin, --csv or a --server and --token option!'
+                    )
+                if args.xml is not None:
+                    sdvx.import_music_db_or_appeal_cards(args.xml)
+                if args.bin is not None:
+                    sdvx.import_catalog(args.bin)
+                if args.csv is not None:
+                    sdvx.import_appeal_cards(args.csv)
         sdvx.close()
 
     elif args.series == GameConstants.MUSECA:
