@@ -3299,7 +3299,7 @@ class ImportSDVX(ImportBase):
         elif actual_version in [None, VersionConstants.SDVX_HEAVENLY_HAVEN, VersionConstants.SDVX_VIVID_WAVE, VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP]:
             self.charts = [0, 1, 2, 3, 4]
         else:
-            raise Exception("Unsupported SDVX version, expected one of the following: 1, 2, 3, 4, 5!")
+            raise Exception("Unsupported SDVX version, expected one of the following: 1, 2, 3, 4, 5, plus-5!")
 
         super().__init__(config, GameConstants.SDVX, actual_version, no_combine, update)
 
@@ -3427,6 +3427,7 @@ class ImportSDVX(ImportBase):
 
             if game_version == VersionConstants.SDVX_BOOTH:
                 # Find normal info about the song
+                version = 1
                 for info in music_entry.findall('info'):
                     if info.attrib['attr'] == 'title_yomigana':
                         title = jaconv.h2z(info.text)
@@ -3464,6 +3465,7 @@ class ImportSDVX(ImportBase):
                 filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
+                version = info.find('version').text
 
                 # Grab valid difficulties
                 for difficulty in music_entry.find('difficulty'):
@@ -3487,6 +3489,7 @@ class ImportSDVX(ImportBase):
                 filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
+                version = info.find('version').text
 
                 # Grab valid difficulties
                 for difficulty in music_entry.find('difficulty'):
@@ -3537,10 +3540,18 @@ class ImportSDVX(ImportBase):
             self.start_batch()
             for chart in self.charts:
                 # SDVX plus modpack has songids starting at 1 so it overlaps officials. This
-                # causes us to have to use a similar solution to ReflecBeat and DDR. Thankfully, the musicdb
-                # provides an ascii identifier for every song to differentiate between songs without using the songids.
-                # So use that to check.
-                old_id = self.get_music_id_for_song_data(None, None, f'{songid}_{filename}', chart, version=0)
+                # causes us to have to use a similar solution to ReflecBeat and DDR. Although we could
+                # use an ASCII identifier given to us in the music_db, that wouldn't be compatible with
+                # how we used to save the songs so just explicitly say plus or normal as well as the music_id
+                # since Voltex doesn't normally switch musicids anyways
+                if self.version > DBConstants.OMNIMIX_VERSION_BUMP:
+                    song_version = 'plus'
+                    folder = self.version
+                else:
+                    song_version = 'normal'
+                    folder = version
+
+                old_id = self.get_music_id_for_song_data(None, None, f'{songid}_{song_version}', chart, version=0)
                 if self.no_combine or old_id is None:
                     # Insert original
                     print(f"New entry for {songid} chart {chart}")
@@ -3557,13 +3568,13 @@ class ImportSDVX(ImportBase):
                         chart,
                         title,
                         artist,
-                        f'{songid}_{filename}',
+                        f'{songid}_{song_version}',
                         {
                             'limited': limited[chart],
                             'difficulty': difficulties[chart],
                             'bpm_min': bpm_min,
                             'bpm_max': bpm_max,
-                            'chart_id': filename,
+                            'folder': folder,
                         },
                         version=0,
                     )
@@ -3573,13 +3584,13 @@ class ImportSDVX(ImportBase):
                             old_id,
                             title,
                             artist,
-                            f'{songid}_{filename}',
+                            f'{songid}_{song_version}',
                             {
                                 'limited': limited[chart],
                                 'difficulty': difficulties[chart],
                                 'bpm_min': bpm_min,
                                 'bpm_max': bpm_max,
-                                'chart_id': filename,
+                                'folder': folder
                             },
                             version=0,
                         )
@@ -3589,7 +3600,6 @@ class ImportSDVX(ImportBase):
                     'difficulty': difficulties[chart],
                     'bpm_min': bpm_min,
                     'bpm_max': bpm_max,
-                    'chart_id': filename,
                 }
                 # Add normal entry for this song
                 self.insert_music_id_for_song(next_id, songid, chart, title, artist, None, data)
@@ -3715,9 +3725,49 @@ class ImportSDVX(ImportBase):
         self.finish_batch()
 
     def populate_webui(self) -> None:
-        songs = MusicData.get_all_songs(GameConstants.SDVX)
-        print("hihihihi")
-
+        music = MusicData(self._ImportBase__config, self._ImportBase__session)
+        voltex_versions = [VersionConstants.SDVX_BOOTH, VersionConstants.SDVX_INFINITE_INFECTION,
+                        VersionConstants.SDVX_GRAVITY_WARS, VersionConstants.SDVX_HEAVENLY_HAVEN,
+                        VersionConstants.SDVX_VIVID_WAVE, VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP]
+        for game_version in voltex_versions[::-1]:
+            self.start_batch()
+            songs = music.get_all_songs(self.game, version=game_version)
+            for i in songs:
+                # Check if already imported
+                songid = i.id
+                if game_version > DBConstants.OMNIMIX_VERSION_BUMP:
+                    song_version = 'plus'
+                else:
+                    song_version = 'normal'
+                old_id = self.get_music_id_for_song_data(None, None, f'{songid}_{song_version}', i.chart, version=0)
+                if old_id is None:
+                    old_id = self.get_music_id_for_song(songid, i.chart, i.version)
+                    song_versions = music.get_all_versions_of_song(self.game, game_version, i.id, i.chart)
+                    lowest_version = VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP
+                    for i in song_versions:
+                        if 0 < i.version < lowest_version:
+                            lowest_version = i.version
+                            real_song_id = i.id
+                    
+                    # Add virtual music entry
+                    print(f"Reused entry for {songid} chart {i.chart}")
+                    self.insert_music_id_for_song(
+                        old_id,
+                        i.version * 10000 + songid,
+                        i.chart,
+                        i.name,
+                        i.artist,
+                        f'{real_song_id}_{song_version}',
+                        {
+                            'limited': i.data['limited'],
+                            'difficulty': i.data['difficulty'],
+                            'bpm_min': i.data['bpm_min'],
+                            'bpm_max': i.data['bpm_max'],
+                            'folder': lowest_version,
+                        },
+                        version=0,
+                    )
+            self.finish_batch()
 
 class ImportMuseca(ImportBase):
 

@@ -13,6 +13,8 @@ class SoundVoltexFrontend(FrontendBase):
 
     game = GameConstants.SDVX
 
+    version = 0
+
     valid_charts = [
         SoundVoltexBase.CHART_TYPE_NOVICE,
         SoundVoltexBase.CHART_TYPE_ADVANCED,
@@ -106,5 +108,5 @@ class SoundVoltexFrontend(FrontendBase):
             new_song['difficulties'][new.chart] = new.data.get_int('difficulty', 21)
         # Set the category to the earliest seen version of this song
         if existing['category'] == 0:
-            new_song['category'] = new.version
+            new_song['category'] = new.data['folder']
         return new_song
