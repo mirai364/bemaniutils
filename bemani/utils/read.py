@@ -3421,7 +3421,6 @@ class ImportSDVX(ImportBase):
             artist = None
             bpm_min = None
             bpm_max = None
-            filename = None
             limited = [0, 0, 0, 0, 0]
             difficulties = [0, 0, 0, 0, 0]
 
@@ -3439,8 +3438,6 @@ class ImportSDVX(ImportBase):
                         bpm_max = float(info.text)
                     if info.attrib['attr'] == 'limited':
                         limited = [int(info.text), int(info.text), int(info.text), int(info.text)]
-                    if info.attrib['attr'] == 'ascii':
-                        filename = info.text
                 # Make sure we got everything
                 if title is None or artist is None or bpm_min is None or bpm_max is None:
                     raise Exception(f'Couldn\'t parse info for song {songid}')
@@ -3462,7 +3459,6 @@ class ImportSDVX(ImportBase):
                 info = music_entry.find('info')
                 title = info.find('title_name').text
                 artist = info.find('artist_name').text
-                filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
                 version = info.find('version').text
@@ -3486,7 +3482,6 @@ class ImportSDVX(ImportBase):
                 info = music_entry.find('info')
                 title = info.find('title_name').text
                 artist = info.find('artist_name').text
-                filename = info.find('ascii').text
                 bpm_min = float(info.find('bpm_min').text) / 100.0
                 bpm_max = float(info.find('bpm_max').text) / 100.0
                 version = info.find('version').text
@@ -3727,8 +3722,8 @@ class ImportSDVX(ImportBase):
     def populate_webui(self) -> None:
         music = MusicData(self._ImportBase__config, self._ImportBase__session)
         voltex_versions = [VersionConstants.SDVX_BOOTH, VersionConstants.SDVX_INFINITE_INFECTION,
-                        VersionConstants.SDVX_GRAVITY_WARS, VersionConstants.SDVX_HEAVENLY_HAVEN,
-                        VersionConstants.SDVX_VIVID_WAVE, VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP]
+                           VersionConstants.SDVX_GRAVITY_WARS, VersionConstants.SDVX_HEAVENLY_HAVEN,
+                           VersionConstants.SDVX_VIVID_WAVE, VersionConstants.SDVX_VIVID_WAVE + DBConstants.OMNIMIX_VERSION_BUMP]
         for game_version in voltex_versions[::-1]:
             self.start_batch()
             songs = music.get_all_songs(self.game, version=game_version)
@@ -3748,7 +3743,7 @@ class ImportSDVX(ImportBase):
                         if 0 < i.version < lowest_version:
                             lowest_version = i.version
                             real_song_id = i.id
-                    
+
                     # Add virtual music entry
                     print(f"Reused entry for {songid} chart {i.chart}")
                     self.insert_music_id_for_song(
@@ -3768,6 +3763,7 @@ class ImportSDVX(ImportBase):
                         version=0,
                     )
             self.finish_batch()
+
 
 class ImportMuseca(ImportBase):
 
