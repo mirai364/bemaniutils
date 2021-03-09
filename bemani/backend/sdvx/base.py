@@ -133,11 +133,11 @@ class SoundVoltexBase(CoreHandler, CardManagerHandler, PASELIHandler, Base):
         all_attempts, remote_attempts = Parallel.execute([
             lambda: self.data.local.music.get_all_attempts(
                 game=self.game,
-                version=self.version,
+                version=self.music_version,
             ),
             lambda: self.data.remote.music.get_clear_rates(
                 game=self.game,
-                version=self.version,
+                version=self.music_version,
             )
         ])
         attempts: Dict[int, Dict[int, Dict[str, int]]] = {}
@@ -232,7 +232,7 @@ class SoundVoltexBase(CoreHandler, CardManagerHandler, PASELIHandler, Base):
         if userid is not None:
             oldscore = self.data.local.music.get_score(
                 self.game,
-                self.version,
+                self.music_version,
                 userid,
                 songid,
                 chart,
@@ -280,7 +280,7 @@ class SoundVoltexBase(CoreHandler, CardManagerHandler, PASELIHandler, Base):
             # Write the new score back
             self.data.local.music.put_score(
                 self.game,
-                self.version,
+                self.music_version,
                 userid,
                 songid,
                 chart,
@@ -293,7 +293,7 @@ class SoundVoltexBase(CoreHandler, CardManagerHandler, PASELIHandler, Base):
         # Save the history of this score too
         self.data.local.music.put_attempt(
             self.game,
-            self.version,
+            self.music_version,
             userid,
             songid,
             chart,
