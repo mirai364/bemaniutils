@@ -1,7 +1,34 @@
 import argparse
 import pefile  # type: ignore
 import struct
-from typing import Tuple, List, Any
+import sys
+from typing import Optional, Tuple, List, Any
+
+
+"""
+Some examples of valid format specifiers and what they do are as follows:
+
+*z&+0x200# = Decodes an array of string pointers, and includes the count
+             alongside the string, starting at 0x200, and displayed in
+             hex. Broken down, it has the following parts:
+
+             *z = Dereference the current value (*) and treat that integer
+                  as a pointer to a null-terminated string (z).
+             &+0x200# = Print the current line number (#), offset by the
+                        value 0x200 (+0x200) as a hex number (&).
+"""
+
+
+class LineNumber:
+    def __init__(self, offset: int, hex: bool) -> None:
+        self.offset = offset
+        self.hex = hex
+
+    def toStr(self, lineno: int) -> str:
+        if self.hex:
+            return str(hex(self.offset + lineno))
+        else:
+            return str(self.offset + lineno)
 
 
 class StructPrinter:
@@ -67,7 +94,8 @@ class StructPrinter:
 
                 continue
 
-            if c.isdigit():
+            # If we have either an integer prefix, or an offset prefix, accumulate here.
+            if c.isdigit() or c in '+-' or (c in 'xabcdefABCDEF' and ('+' in cur_accum or '-' in cur_accum)):
                 cur_accum += c
                 continue
 
@@ -101,29 +129,43 @@ class StructPrinter:
                 return (offset - start) + section.PointerToRawData
         raise Exception(f'Couldn\'t find raw offset for virtual offset 0x{offset:08x}')
 
-    def parse_struct(self, startaddr: str, endaddr: str, fmt: str) -> List[Any]:
+    def parse_struct(self, startaddr: str, endaddr: str, countstr: str, fmt: str) -> List[Any]:
         start: int = int(startaddr, 16)
-        end: int = int(endaddr, 16)
+        end: Optional[int] = int(endaddr, 16) if endaddr is not None else None
+        count: Optional[int] = int(countstr, 16 if "0x" in countstr else 10) if countstr is not None else None
+
+        if end is None and count is None:
+            raise Exception("Can't handle endless structures!")
+        if end is not None and count is not None:
+            raise Exception("Can't handle providing two ends!")
 
         if start >= self.pe.OPTIONAL_HEADER.ImageBase:
             # Assume this is virtual
             start = self.virtual_to_physical(start)
 
-        if end >= self.pe.OPTIONAL_HEADER.ImageBase:
+        if end is not None and end >= self.pe.OPTIONAL_HEADER.ImageBase:
             # Assume this is virtual
             end = self.virtual_to_physical(end)
 
         # Parse out any dereference instructions.
         prefix, specs = self.parse_format_spec(fmt)
 
-        return self.__parse_struct(start, end, prefix, specs)
+        return self.__parse_struct(start, end, count, prefix, specs)
 
-    def __parse_struct(self, start: int, end: int, prefix: str, specs: List[Any]) -> List[Any]:
+    def __parse_struct(self, start: int, end: Optional[int], count: Optional[int], prefix: str, specs: List[Any]) -> List[Any]:
         # Now, parse out each chunk.
         output = []
         offset = start
-        while offset < end:
-            line = []
+        while True:
+            if end is not None:
+                if offset >= end:
+                    break
+            if count is not None:
+                if count <= 0:
+                    break
+                count -= 1
+
+            line: List[Any] = []
             for spec in specs:
                 if isinstance(spec, str):
                     if spec[0] == "&":
@@ -132,7 +174,15 @@ class StructPrinter:
                     else:
                         dohex = False
 
-                    if spec == "z":
+                    if spec[-1] == "#":
+                        if len(spec) > 1:
+                            if spec[0] not in "+-":
+                                raise Exception("Line number offsets must include a '+' or '-' prefix!")
+                            val = int(spec[:-1], 16 if "0x" in spec else 10)
+                        else:
+                            val = 0
+                        line.append(LineNumber(val, dohex))
+                    elif spec == "z":
                         # Null-terminated string
                         bs = b""
                         while self.data[offset:(offset + 1)] != b"\x00":
@@ -148,10 +198,11 @@ class StructPrinter:
                     else:
                         size = struct.calcsize(prefix + spec)
                         chunk = self.data[offset:(offset + size)]
-                        if dohex:
-                            line.append(hex(struct.unpack(prefix + spec, chunk)[0]))
-                        else:
-                            line.append(struct.unpack(prefix + spec, chunk)[0])
+                        if spec != 'x':
+                            if dohex:
+                                line.append(hex(struct.unpack(prefix + spec, chunk)[0]))
+                            else:
+                                line.append(struct.unpack(prefix + spec, chunk)[0])
                         offset += size
                 else:
                     chunk = self.data[offset:(offset + 4)]
@@ -160,18 +211,22 @@ class StructPrinter:
 
                     # Resolve the physical address of this pointer, trick the substructure into
                     # parsing only one iteration.
-                    pointer = self.virtual_to_physical(pointer)
-                    subparse = self.__parse_struct(pointer, pointer + 1, prefix, spec)
-                    if len(subparse) != 1:
-                        raise Exception("Logic error!")
-                    line.append(subparse[0])
+                    if pointer == 0x0:
+                        # Null pointer
+                        line.append(None)
+                    else:
+                        pointer = self.virtual_to_physical(pointer)
+                        subparse = self.__parse_struct(pointer, pointer + 1, None, prefix, spec)
+                        if len(subparse) != 1:
+                            raise Exception("Logic error!")
+                        line.append(subparse[0])
 
             output.append(line)
 
         return output
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to print structs out of a DLL.")
     parser.add_argument(
         "--file",
@@ -189,10 +244,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--end",
-        help="Hex offset into the file we should go until.",
+        help="Hex offset into the file we should go until. Alternatively you can use --count",
         type=str,
         default=None,
-        required=True,
+    )
+    parser.add_argument(
+        "--count",
+        help="Number of entries to parse, as a decimal or hex integer. Alternatively you can use --end",
+        type=str,
+        default=None,
     )
     parser.add_argument(
         "--format",
@@ -201,7 +261,9 @@ def main() -> None:
             "for details. Additionally, prefixing a format specifier with * allows dereferencing pointers. "
             "Surround a chunk of format specifiers with parenthesis to dereference complex structures. For "
             "ease of unpacking C string pointers, the specifier \"z\" is recognzied to mean null-terminated "
-            "string. A % preceeding a format specifier means that we should convert to hex before displaying."
+            "string. A & preceeding a format specifier means that we should convert to hex before displaying."
+            "For the ease of decoding enumerations, the specifier \"#\" is recognized to mean entry number."
+            "You can provide it a offset value such as \"+20#\" to start at a certain number."
         ),
         type=str,
         default=None,
@@ -209,15 +271,37 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.end is None and args.count is None:
+        print("You must specify either an --end or a --count!", file=sys.stderr)
+        return 1
+    if args.end is not None and args.count is not None:
+        print("You cannot specify both an --end and a --count!", file=sys.stderr)
+        return 1
+
     fp = open(args.file, 'rb')
     data = fp.read()
     fp.close()
 
+    def __str(obj: object, lineno: int) -> str:
+        if obj is None:
+            return "NULL"
+        elif isinstance(obj, LineNumber):
+            return obj.toStr(lineno)
+        elif isinstance(obj, list):
+            if len(obj) == 1:
+                return __str(obj[0], lineno)
+            else:
+                return f"({', '.join(__str(o, lineno) for o in obj)})"
+        else:
+            return repr(obj)
+
     printer = StructPrinter(data)
-    lines = printer.parse_struct(args.start, args.end, args.format)
-    for line in lines:
-        print(line)
+    lines = printer.parse_struct(args.start, args.end, args.count, args.format)
+    for i, line in enumerate(lines):
+        print(", ".join(__str(entry, i) for entry in line))
+
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
