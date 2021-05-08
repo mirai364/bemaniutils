@@ -1,5 +1,22 @@
 # vim: set fileencoding=utf-8
-from typing import List, Dict, Any
+import sys
+import unittest
+from typing import Container, List, Dict, Any
+
+
+# Supress custom handler tracebacks inside handler frames
+__unittest = True
+
+
+class ExtendedTestCase(unittest.TestCase):
+    @property
+    def verbose(self) -> bool:
+        return ("-v" in sys.argv) or ("--verbose" in sys.argv)
+
+    def assertItemsEqual(self, a: Container[Any], b: Container[Any]) -> None:
+        a_items = {x for x in a}
+        b_items = {x for x in b}
+        self.assertEqual(a_items, b_items)
 
 
 class FakeCursor():
