@@ -16,6 +16,22 @@ class Color:
             'a': self.a,
         }
 
+    def multiply(self, other: "Color") -> "Color":
+        return Color(
+            r=self.r * other.r,
+            g=self.g * other.g,
+            b=self.b * other.b,
+            a=self.a * other.a,
+        )
+
+    def add(self, other: "Color") -> "Color":
+        return Color(
+            r=self.r + other.r,
+            g=self.g + other.g,
+            b=self.b + other.b,
+            a=self.a + other.a,
+        )
+
     def as_tuple(self) -> Tuple[int, int, int, int]:
         return (
             int(self.r * 255),
@@ -118,6 +134,17 @@ class Matrix:
         return Point(
             x=(self.a * point.x) + (self.c * point.y) + self.tx,
             y=(self.b * point.x) + (self.d * point.y) + self.ty,
+        )
+
+    def translate(self, point: Point) -> "Matrix":
+        new_point = self.multiply_point(point)
+        return Matrix(
+            a=self.a,
+            b=self.b,
+            c=self.c,
+            d=self.d,
+            tx=new_point.x,
+            ty=new_point.y,
         )
 
     def multiply(self, other: "Matrix") -> "Matrix":

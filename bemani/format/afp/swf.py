@@ -8,6 +8,7 @@ from .types import Matrix, Color, Point, Rectangle
 from .types import (
     AP2Action,
     AP2Tag,
+    AP2Trigger,
     DefineFunction2Action,
     InitRegisterAction,
     StoreRegisterAction,
@@ -110,6 +111,20 @@ class AP2ShapeTag(Tag):
         }
 
 
+class AP2ImageTag(Tag):
+    def __init__(self, id: int, reference: str) -> None:
+        super().__init__(id)
+
+        # The reference is the name of a texture that will be displayed directly.
+        self.reference = reference
+
+    def as_dict(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        return {
+            **super().as_dict(*args, **kwargs),
+            'reference': self.reference,
+        }
+
+
 class AP2DefineFontTag(Tag):
     def __init__(self, id: int, fontname: str, xml_prefix: str, heights: List[int], text_indexes: List[int]) -> None:
         super().__init__(id)
@@ -194,6 +209,18 @@ class AP2DefineButtonTag(Tag):
         # TODO: I need to figure out what buttons actually DO, and take the
         # values that I parsed out store them here...
         super().__init__(id)
+
+    def as_dict(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        return {
+            **super().as_dict(*args, **kwargs),
+        }
+
+
+class AP2PlaceCameraTag(Tag):
+    def __init__(self) -> None:
+        # TODO: I need to figure out what camera placements actually DO, and take the
+        # values that I parsed out store them here...
+        super().__init__(None)
 
     def as_dict(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         return {
@@ -943,7 +970,7 @@ class SWF(TrackedCoverage, VerboseOutput):
         size: int,
         dataoffset: int,
         tag_parent_sprite: Optional[int],
-        tag_frame: int,
+        tag_frame: str,
         prefix: str = "",
     ) -> Tag:
         if tagid == AP2Tag.AP2_SHAPE:
@@ -1008,7 +1035,7 @@ class SWF(TrackedCoverage, VerboseOutput):
             return AP2DefineFontTag(font_id, fontname, xml_prefix, heights, text_indexes)
         elif tagid == AP2Tag.AP2_DO_ACTION:
             datachunk = ap2data[dataoffset:(dataoffset + size)]
-            bytecode = self.__parse_bytecode(f"on_enter_{f'sprite_{tag_parent_sprite}' if tag_parent_sprite is not None else 'main'}_frame_{tag_frame}", datachunk, prefix=prefix)
+            bytecode = self.__parse_bytecode(f"on_enter_{f'sprite_{tag_parent_sprite}' if tag_parent_sprite is not None else 'main'}_{tag_frame}", datachunk, prefix=prefix)
             self.add_coverage(dataoffset, size)
 
             return AP2DoActionTag(bytecode)
@@ -1017,11 +1044,21 @@ class SWF(TrackedCoverage, VerboseOutput):
             datachunk = ap2data[dataoffset:(dataoffset + size)]
             flags, depth, object_id = struct.unpack("<IHH", datachunk[0:8])
             self.add_coverage(dataoffset, 8)
+            running_pointer = 8
+
+            # Make sure we grab the second half of flags as well, since this is read first for
+            # newer games.
+            if flags & 0x80000000:
+                more_flags = struct.unpack("<I", datachunk[running_pointer:(running_pointer + 4)])[0]
+                self.add_coverage(dataoffset + running_pointer, 4)
+                running_pointer += 4
+
+                flags = flags | (more_flags << 32)
+                unhandled_flags = flags & ~0x80000000
+            else:
+                unhandled_flags = flags
 
             self.vprint(f"{prefix}    Flags: {hex(flags)}, Object ID: {object_id}, Depth: {depth}")
-
-            running_pointer = 8
-            unhandled_flags = flags
 
             if flags & 0x2:
                 # Has a shape component.
@@ -1115,11 +1152,13 @@ class SWF(TrackedCoverage, VerboseOutput):
             # Handle object colors
             multcolor = Color(1.0, 1.0, 1.0, 1.0)
             addcolor = Color(0.0, 0.0, 0.0, 0.0)
+            multdisplayed = False
+            adddisplayed = False
 
             if flags & 0x800:
                 # Multiplicative color present.
                 unhandled_flags &= ~0x800
-                r, g, b, a = struct.unpack("<HHHH", datachunk[running_pointer:(running_pointer + 8)])
+                r, g, b, a = struct.unpack("<hhhh", datachunk[running_pointer:(running_pointer + 8)])
                 self.add_coverage(dataoffset + running_pointer, 8)
                 running_pointer += 8
 
@@ -1128,11 +1167,12 @@ class SWF(TrackedCoverage, VerboseOutput):
                 multcolor.b = float(b) / 255.0
                 multcolor.a = float(a) / 255.0
                 self.vprint(f"{prefix}    Mult Color: {multcolor}")
+                multdisplayed = True
 
             if flags & 0x1000:
                 # Additive color present.
                 unhandled_flags &= ~0x1000
-                r, g, b, a = struct.unpack("<HHHH", datachunk[running_pointer:(running_pointer + 8)])
+                r, g, b, a = struct.unpack("<hhhh", datachunk[running_pointer:(running_pointer + 8)])
                 self.add_coverage(dataoffset + running_pointer, 8)
                 running_pointer += 8
 
@@ -1141,6 +1181,7 @@ class SWF(TrackedCoverage, VerboseOutput):
                 addcolor.b = float(b) / 255.0
                 addcolor.a = float(a) / 255.0
                 self.vprint(f"{prefix}    Add Color: {addcolor}")
+                adddisplayed = True
 
             if flags & 0x2000:
                 # Multiplicative color present, smaller integers.
@@ -1154,6 +1195,7 @@ class SWF(TrackedCoverage, VerboseOutput):
                 multcolor.b = float((rgba >> 8) & 0xFF) / 255.0
                 multcolor.a = float(rgba & 0xFF) / 255.0
                 self.vprint(f"{prefix}    Mult Color: {multcolor}")
+                multdisplayed = True
 
             if flags & 0x4000:
                 # Additive color present, smaller integers.
@@ -1167,6 +1209,15 @@ class SWF(TrackedCoverage, VerboseOutput):
                 addcolor.b = float((rgba >> 8) & 0xFF) / 255.0
                 addcolor.a = float(rgba & 0xFF) / 255.0
                 self.vprint(f"{prefix}    Add Color: {addcolor}")
+                adddisplayed = True
+
+            # For easier debugging, display the default color when the color
+            # is being used.
+            if flags & 0x8:
+                if not multdisplayed:
+                    self.vprint(f"{prefix}    Mult Color: {multcolor}")
+                if not adddisplayed:
+                    self.vprint(f"{prefix}    Add Color: {addcolor}")
 
             bytecodes: Dict[int, List[ByteCode]] = {}
             if flags & 0x80:
@@ -1199,33 +1250,33 @@ class SWF(TrackedCoverage, VerboseOutput):
                         self.add_coverage(dataoffset + evt_offset, 8)
 
                         events: List[str] = []
-                        if evt_flags & 0x1:
+                        if evt_flags & AP2Trigger.ON_LOAD:
                             events.append("ON_LOAD")
-                        if evt_flags & 0x2:
+                        if evt_flags & AP2Trigger.ON_ENTER_FRAME:
                             events.append("ON_ENTER_FRAME")
-                        if evt_flags & 0x4:
+                        if evt_flags & AP2Trigger.ON_UNLOAD:
                             events.append("ON_UNLOAD")
-                        if evt_flags & 0x8:
+                        if evt_flags & AP2Trigger.ON_MOUSE_MOVE:
                             events.append("ON_MOUSE_MOVE")
-                        if evt_flags & 0x10:
+                        if evt_flags & AP2Trigger.ON_MOUSE_DOWN:
                             events.append("ON_MOUSE_DOWN")
-                        if evt_flags & 0x20:
+                        if evt_flags & AP2Trigger.ON_MOUSE_UP:
                             events.append("ON_MOUSE_UP")
-                        if evt_flags & 0x40:
+                        if evt_flags & AP2Trigger.ON_KEY_DOWN:
                             events.append("ON_KEY_DOWN")
-                        if evt_flags & 0x80:
+                        if evt_flags & AP2Trigger.ON_KEY_UP:
                             events.append("ON_KEY_UP")
-                        if evt_flags & 0x100:
+                        if evt_flags & AP2Trigger.ON_DATA:
                             events.append("ON_DATA")
-                        if evt_flags & 0x400:
+                        if evt_flags & AP2Trigger.ON_PRESS:
                             events.append("ON_PRESS")
-                        if evt_flags & 0x800:
+                        if evt_flags & AP2Trigger.ON_RELEASE:
                             events.append("ON_RELEASE")
-                        if evt_flags & 0x1000:
+                        if evt_flags & AP2Trigger.ON_RELEASE_OUTSIDE:
                             events.append("ON_RELEASE_OUTSIDE")
-                        if evt_flags & 0x2000:
+                        if evt_flags & AP2Trigger.ON_ROLL_OVER:
                             events.append("ON_ROLL_OVER")
-                        if evt_flags & 0x4000:
+                        if evt_flags & AP2Trigger.ON_ROLL_OUT:
                             events.append("ON_ROLL_OUT")
 
                         bytecode_offset += evt_offset
@@ -1241,7 +1292,8 @@ class SWF(TrackedCoverage, VerboseOutput):
 
             if flags & 0x10000:
                 # Some sort of filter data? Not sure what this is either. Needs more investigation
-                # if I encounter files with it.
+                # if I encounter files with it. This seems to match up with SWF documentation on
+                # filters. Still have yet to see any files with it.
                 unhandled_flags &= ~0x10000
                 count, filter_size = struct.unpack("<HH", datachunk[running_pointer:(running_pointer + 4)])
                 self.add_coverage(dataoffset + running_pointer, 4)
@@ -1256,14 +1308,27 @@ class SWF(TrackedCoverage, VerboseOutput):
 
             rotation_offset = None
             if flags & 0x1000000:
-                # Some sort of point, perhaps an x, y offset for the object or a center point for rotation?
+                # I am certain that this is the rotation origin, as treating it as such works for
+                # basically all files.
                 unhandled_flags &= ~0x1000000
-                x, y = struct.unpack("<II", datachunk[running_pointer:(running_pointer + 8)])
+                x, y = struct.unpack("<ii", datachunk[running_pointer:(running_pointer + 8)])
                 self.add_coverage(dataoffset + running_pointer, 8)
                 running_pointer += 8
 
                 rotation_offset = Point(float(x) / 20.0, float(y) / 20.0)
                 self.vprint(f"{prefix}    Rotation Origin: {rotation_offset}")
+
+            if flags & 0x200000000:
+                # TODO: This might be z rotation origin? I've only seen it on files that have a place
+                # camera, and its setting a local value that is close to the rotation origin
+                # x and y constants.
+                unhandled_flags &= ~0x200000000
+                z_int = struct.unpack("<i", datachunk[running_pointer:(running_pointer + 4)])[0]
+                self.add_coverage(dataoffset + running_pointer, 4)
+                running_pointer += 4
+
+                z = float(z_int) / 20.0
+                self.vprint(f"{prefix}    Unknown Rotation Origin Float: {z}")
 
             if flags & 0x2000000:
                 # Same as above, but initializing to 0, 0 instead of from data.
@@ -1272,7 +1337,8 @@ class SWF(TrackedCoverage, VerboseOutput):
                 self.vprint(f"{prefix}    Rotation Origin: {rotation_offset}")
 
             if flags & 0x40000:
-                # Some pair of shorts, not sure, its in DDR PS3 data.
+                # This appears in newer IIDX to be an alternative method for populating
+                # transform scaling.
                 unhandled_flags &= ~0x40000
 
                 # This is a bit nasty, but the newest version of data we see in
@@ -1283,27 +1349,149 @@ class SWF(TrackedCoverage, VerboseOutput):
                 if running_pointer == len(datachunk):
                     pass
                 else:
-                    x, y = struct.unpack("<HH", datachunk[running_pointer:(running_pointer + 4)])
+                    a_int, d_int = struct.unpack("<hh", datachunk[running_pointer:(running_pointer + 4)])
                     self.add_coverage(dataoffset + running_pointer, 4)
                     running_pointer += 4
 
-                    # TODO: I have no idea what these are.
-                    point = Point(float(x) * 3.051758e-05, float(y) * 3.051758e-05)
-                    self.vprint(f"{prefix}    Point: {point}")
+                    transform.a = float(a_int) / 32768.0
+                    transform.d = float(d_int) / 32768.0
+                    self.vprint(f"{prefix}    Transform Matrix A: {transform.a}, D: {transform.d}")
 
             if flags & 0x80000:
-                # Some pair of shorts, not sure, its in DDR PS3 data.
+                # This appears in newer IIDX to be an alternative method for populating
+                # transform rotation.
                 unhandled_flags &= ~0x80000
-                x, y = struct.unpack("<HH", datachunk[running_pointer:(running_pointer + 4)])
+                b_int, c_int = struct.unpack("<hh", datachunk[running_pointer:(running_pointer + 4)])
                 self.add_coverage(dataoffset + running_pointer, 4)
                 running_pointer += 4
 
-                # TODO: I have no idea what these are.
-                point = Point(float(x) * 3.051758e-05, float(y) * 3.051758e-05)
-                self.vprint(f"{prefix}    Point: {point}")
+                transform.b = float(b_int) / 32768.0
+                transform.c = float(c_int) / 32768.0
+                self.vprint(f"{prefix}    Transform Matrix B: {transform.b}, C: {transform.c}")
+
+            if flags & 0x100000:
+                # TODO: Some unknown short.
+                unhandled_flags &= ~0x100000
+                unk_4 = struct.unpack("<H", datachunk[running_pointer:(running_pointer + 2)])[0]
+                self.add_coverage(dataoffset + running_pointer, 2)
+                running_pointer += 2
+
+                self.vprint(f"{prefix}    Unk 4: {unk_4}")
+
+            # Due to possible misalignment, we need to realign.
+            misalignment = running_pointer & 3
+            if misalignment > 0:
+                catchup = 4 - misalignment
+                self.add_coverage(dataoffset + running_pointer, catchup)
+                running_pointer += catchup
+
+            if flags & 0x8000000:
+                # TODO: Some unknown float. This might be the "tz" value for a 3D matrix.
+                unhandled_flags &= ~0x8000000
+                unk_5 = struct.unpack("<i", datachunk[running_pointer:(running_pointer + 4)])[0]
+                self.add_coverage(dataoffset + running_pointer, 4)
+                running_pointer += 4
+
+                unk_5_f = unk_5 / 20.0
+
+                self.vprint(f"{prefix}    Unk 5: {unk_5_f}")
+
+            if flags & 0x10000000:
+                # TODO: Absolutely no idea, the games that use this reuse the transform
+                # matrix variables but then don't put them in the same spot, so
+                # this might be a 3D transform matrix? Would make sense given the
+                # unknown float above as well as the unknown rotation origin above
+                # as well as the newly-discovered AP2_PLACE_CAMERA tag.
+                unhandled_flags &= ~0x10000000
+                ints = struct.unpack("<iiiiiiiii", datachunk[running_pointer:(running_pointer + 36)])
+                self.add_coverage(dataoffset + running_pointer, 36)
+                running_pointer += 36
+
+                floats = [float(i) / 1024.0 for i in ints]
+
+                self.vprint(f"{prefix}    Unknown 3D Transform Matrix: {', '.join(str(f) for f in floats)}")
+
+            if flags & 0x20000000:
+                # TODO: Again, absolutely no idea, gets passed into a function and I
+                # don't see how its used.
+                unhandled_flags &= ~0x20000000
+                unk_a, unk_b, unk_c = struct.unpack("<hbb", datachunk[running_pointer:(running_pointer + 4)])
+                self.add_coverage(dataoffset + running_pointer, 4)
+                running_pointer += 4
+
+                self.vprint(f"{prefix}    Unknown Data: {unk_a}, {unk_b}, {unk_c}")
+
+            if flags & 0x400000000:
+                # There's some serious hanky-panky going on here. The first 4 bytes are a bitmask,
+                # and we advance past data based on some calculation of the number of bits set.
+                # I'll need to run into some data using this to figure out what the heck is going on.
+                raise Exception("TODO")
+
+            if flags & 0x800000000:
+                unhandled_flags &= ~0x800000000
+                bitmask = struct.unpack("<I", datachunk[running_pointer:(running_pointer + 4)])[0]
+                self.add_coverage(dataoffset + running_pointer, 4)
+                running_pointer += 4
+
+                self.vprint(f"{prefix}    Unknown Data Flags: {hex(bitmask)}")
+
+                # I have no idea what any of this is either, so I am duplicating game logic in the
+                # hopes that someday it makes sense.
+                for bit in range(32):
+                    if bool(bitmask & (1 << bit)):
+                        unk_flags, unk_size = struct.unpack("<HH", datachunk[running_pointer:(running_pointer + 4)])
+                        self.add_coverage(dataoffset + running_pointer, 4)
+                        running_pointer += 4
+
+                        chunk_size = (
+                            # Either 2 or 6, depending on unk_flags & 0x10 set.
+                            (((unk_flags & 0x10) | 0x8) >> 2) *
+                            # Either 1 or 2, depending on unk_flags & 0x1 set.
+                            ((unk_flags & 1) + 1) *
+                            # Raw size as read from the header above.
+                            unk_size *
+                            # I assume this is some number of shorts, much like many other
+                            # file formats, so this is why all of these counts are doubled.
+                            2
+                        )
+
+                        self.vprint(f"{prefix}      WTF: {hex(unk_flags)}, {unk_size}, {chunk_size}")
+
+                        # Skip past data.
+                        running_pointer += chunk_size
+
+            if flags & 0x1000000000:
+                # I have no idea what this is, but the two shorts that it pulls out are assigned
+                # to the same variables as those in 0x2000000000, so they're obviously linked.
+                unhandled_flags &= ~0x1000000000
+                unk1, unk2, unk3 = struct.unpack("<Ihh", datachunk[running_pointer:(running_pointer + 8)])
+                self.add_coverage(dataoffset + running_pointer, 8)
+                running_pointer += 8
+
+                self.vprint(f"{prefix}    Unknown New Data: {unk1}, {unk2}, {unk3}")
+
+            if flags & 0x2000000000:
+                # I have no idea what this is, but the two shorts that it pulls out are assigned
+                # to the same variables as those in 0x1000000000, so they're obviously linked.
+                unhandled_flags &= ~0x2000000000
+                unk1, unk2, unk3 = struct.unpack("<Hhh", datachunk[running_pointer:(running_pointer + 6)])
+                self.add_coverage(dataoffset + running_pointer, 6)
+                running_pointer += 6
+
+                self.vprint(f"{prefix}    Unknown New Data: {unk1}, {unk2}, {unk3}")
+
+            # Due to possible misalignment, we need to realign.
+            misalignment = running_pointer & 3
+            if misalignment > 0:
+                catchup = 4 - misalignment
+                self.add_coverage(dataoffset + running_pointer, catchup)
+                running_pointer += catchup
+
+            if flags & 0x4000000000:
+                raise Exception("TODO")
 
             # This flag states whether we are creating a new object on this depth, or updating one.
-            unhandled_flags &= ~0xD
+            unhandled_flags &= ~0x400000D
             if flags & 0x1:
                 self.vprint(f"{prefix}    Update object request")
             else:
@@ -1316,6 +1504,10 @@ class SWF(TrackedCoverage, VerboseOutput):
                 self.vprint(f"{prefix}    Use color information")
             else:
                 self.vprint(f"{prefix}    Ignore color information")
+            if flags & 0x4000000:
+                self.vprint(f"{prefix}    Use 3D transform matrix?")
+            else:
+                self.vprint(f"{prefix}    Ignore 3D transform matrix?")
 
             if unhandled_flags != 0:
                 raise Exception(f"Did not handle {hex(unhandled_flags)} flag bits!")
@@ -1769,6 +1961,58 @@ class SWF(TrackedCoverage, VerboseOutput):
                 raise Exception("TODO: Need to examine this section further if I find data with it!")
 
             return AP2DefineButtonTag(button_id)
+        elif tagid == AP2Tag.AP2_PLACE_CAMERA:
+            flags, unk1, = struct.unpack("<HH", ap2data[dataoffset:(dataoffset + 4)])
+            self.add_coverage(dataoffset, 4)
+            running_data_ptr = dataoffset + 4
+
+            self.vprint(f"{prefix}    Flags: {hex(flags)}, Unknown: {unk1}")
+
+            if flags & 1:
+                i1, i2, i3 = struct.unpack("<iii", ap2data[running_data_ptr:(running_data_ptr + 12)])
+                self.add_coverage(running_data_ptr, 12)
+                running_data_ptr += 12
+
+                # These appear to be camera x, y, z coordinates.
+                f1 = i1 / 20.0
+                f2 = i2 / 20.0
+                f3 = i3 / 20.0
+
+                self.vprint(f"{prefix}      Unknown Floats: {f1}, {f2}, {f3}")
+
+            if flags & 0x2:
+                i4 = struct.unpack("<i", ap2data[running_data_ptr:(running_data_ptr + 4)])[0]
+                self.add_coverage(running_data_ptr, 4)
+                running_data_ptr += 4
+
+                # I have no idea what this is for. The game adds this to f3 above for
+                # some stored calculation.
+                f4 = i4 / 20.0
+
+                self.vprint(f"{prefix}      Unknown Float: {f4}")
+            else:
+                # The games I've looked at will take the stored value of a previously
+                # parsed place camera for f4 if this is set to zero.
+                pass
+
+            if dataoffset + size != running_data_ptr:
+                raise Exception(f"Failed to parse {dataoffset + size - running_data_ptr} bytes of data!")
+
+            return AP2PlaceCameraTag()
+        elif tagid == AP2Tag.AP2_IMAGE:
+            if size != 8:
+                raise Exception(f"Invalid size {size} to get data from AP2_IMAGE!")
+            flags, image_id, image_str_ptr = struct.unpack("<IHH", ap2data[dataoffset:(dataoffset + 8)])
+            image_str = self.__get_string(image_str_ptr)
+            self.add_coverage(dataoffset, 8)
+
+            if flags & 0x2:
+                # This looks like we prepend "SWFA-" to the file name.
+                image_str = f"SWFA-{image_str}"
+
+            self.vprint(f"{prefix}    Tag ID: {image_id}, Flags: {hex(flags)}, String: {image_str}")
+
+            return AP2ImageTag(image_id, image_str)
         else:
             self.vprint(f"Unknown tag {hex(tagid)} with data {ap2data[dataoffset:(dataoffset + size)]!r}")
             raise Exception(f"Unimplemented tag {hex(tagid)}!")
@@ -1795,7 +2039,7 @@ class SWF(TrackedCoverage, VerboseOutput):
 
         # First, parse frames.
         frames: List[Frame] = []
-        tag_to_frame: Dict[int, int] = {}
+        tag_to_frame: Dict[int, str] = {}
         self.vprint(f"{prefix}Number of Frames: {frame_count}")
         for i in range(frame_count):
             frame_info = struct.unpack("<I", ap2data[frame_offset:(frame_offset + 4)])[0]
@@ -1809,7 +2053,7 @@ class SWF(TrackedCoverage, VerboseOutput):
             for j in range(num_tags_to_play):
                 if start_tag_offset + j in tag_to_frame:
                     raise Exception("Logic error!")
-                tag_to_frame[start_tag_offset + j] = i
+                tag_to_frame[start_tag_offset + j] = f"frame_{i}"
             frame_offset += 4
 
         # Now, parse regular tags.
@@ -1826,7 +2070,7 @@ class SWF(TrackedCoverage, VerboseOutput):
                 raise Exception(f"Invalid tag size {size} ({hex(size)})")
 
             self.vprint(f"{prefix}  Tag: {hex(tagid)} ({AP2Tag.tag_to_name(tagid)}), Size: {hex(size)}, Offset: {hex(tags_offset + 4)}")
-            tags.append(self.__parse_tag(ap2_version, afp_version, ap2data, tagid, size, tags_offset + 4, sprite, tag_to_frame[i], prefix=prefix))
+            tags.append(self.__parse_tag(ap2_version, afp_version, ap2data, tagid, size, tags_offset + 4, sprite, tag_to_frame.get(i, 'orphan'), prefix=prefix))
             tags_offset += ((size + 3) & 0xFFFFFFFC) + 4  # Skip past tag header and data, rounding to the nearest 4 bytes.
 
         # Finally, parse frame labels
@@ -1999,7 +2243,7 @@ class SWF(TrackedCoverage, VerboseOutput):
         if flags & 0x1:
             self.vprint(f"  0x1: Movie background color: {self.color}")
         else:
-            self.vprint("  0x2: No movie background color")
+            self.vprint("  0x1: No movie background color")
         if flags & 0x2:
             self.vprint("  0x2: FPS is an integer")
         else:
@@ -2008,7 +2252,7 @@ class SWF(TrackedCoverage, VerboseOutput):
             self.vprint("  0x4: Imported tag initializer section present")
         else:
             self.vprint("  0x4: Imported tag initializer section not present")
-        self.vprint(f"Dimensions: {self.location.width}x{self.location.height}")
+        self.vprint(f"Dimensions: {int(self.location.width)}x{int(self.location.height)}")
         self.vprint(f"Requested FPS: {self.fps}")
 
         # Exported assets
