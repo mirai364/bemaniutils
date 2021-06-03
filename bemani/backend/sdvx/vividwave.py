@@ -1,14 +1,16 @@
 # vim: set fileencoding=utf-8
 import copy
+import random
+import struct
 from typing import Any, Dict, List, Optional, Tuple
-
+from datetime import datetime
 from bemani.backend.ess import EventLogHandler
 from bemani.backend.sdvx.base import SoundVoltexBase
 from bemani.backend.sdvx.heavenlyhaven import SoundVoltexHeavenlyHaven
 from bemani.common import ID, Time, ValidatedDict, VersionConstants
 from bemani.data import Score, UserID
 from bemani.protocol import Node
-
+from discord_webhook import DiscordWebhook, DiscordEmbed  # type: ignore
 
 class SoundVoltexVividWave(
     EventLogHandler,
@@ -3245,9 +3247,23 @@ class SoundVoltexVividWave(
 
     def handle_game_sv5_common_request(self, request: Node) -> Node:
         game = Node.void('game')
-
-        limited = Node.void('music_limited')
-        game.add_child(limited)
+                        
+        extend = Node.void('extend')
+        game.add_child(extend)
+        info = Node.void('info')
+        extend.add_child(info)
+        info.add_child(Node.u32('extend_id', 0))
+        info.add_child(Node.u32('extend_type', 0))
+        info.add_child(Node.s32('param_num_1', 0))
+        info.add_child(Node.s32('param_num_2', 0))
+        info.add_child(Node.s32('param_num_3', 0))
+        info.add_child(Node.s32('param_num_4', 0))
+        info.add_child(Node.s32('param_num_5', 0))
+        info.add_child(Node.string('param_str_1', ''))
+        info.add_child(Node.string('param_str_2', ''))
+        info.add_child(Node.string('param_str_3', ''))
+        info.add_child(Node.string('param_str_4', ''))
+        info.add_child(Node.string('param_str_5', ''))
 
         # Song unlock config
         game_config = self.get_game_config()
@@ -3292,6 +3308,32 @@ class SoundVoltexVividWave(
         enable_event("ICON_FLOOR_INFECTION")
         enable_event("ICON_POLICY_BREAK")
         enable_event("ACHIEVEMENT_ENABLE")
+        enable_event("LEVEL_LIMIT_EASING")
+        enable_event("APICAGACHADRAW\t30")
+        enable_event("AKANAME_ENABLE")
+        enable_event("FACTORY\t10")
+        enable_event("APPEAL_CARD_GEN_NEW_PRICE")
+        enable_event("APRILFOOL_2017")
+        enable_event("CLOUD_LINK_ENABLE")
+        enable_event("PAUSE_ONLINEUPDATE")
+        enable_event("PCBSTATE_CABINETGROUPID")
+        enable_event("REITAISAI2018")
+        enable_event("APPEAL_CARD_UNLOCK\t0,30170914,0,30171014,0,30171116,0,30180201,0,30180607,0,30181206,0,30200326,0,30200611")
+        enable_event("FAVORITE_APPEALCARD_MAX\t100")
+        enable_event("FAVORITE_MUSIC_MAX\t500")
+        enable_event("EVENTDATE_APRILFOOL")
+        enable_event("OMEGA_ARS_ENABLE")
+        enable_event("DISABLE_MONITOR_ID_CHECK")
+        enable_event("SKILL_ANALYZER_ABLE")
+        enable_event("STANDARD_UNLOCK_ENABLE")
+        enable_event("PLAYERJUDGEADJ_ENABLE")
+        enable_event("MIXID_INPUT_ENABLE")
+        enable_event("BLASTER_ABLE")
+        enable_event("EVENTDATE_ONIGO")
+        enable_event("EVENTDATE_GOTT")
+        enable_event("EXTRACK_ENABLE")
+        enable_event("II_BGM")
+        enable_event("OMEGA_ENABLE\t6,7,8,9")
         enable_event("VOLFORCE_ENABLE")
         enable_event("CONTINUATION")
         enable_event("TENKAICHI_MODE")
@@ -3301,14 +3343,10 @@ class SoundVoltexVividWave(
         enable_event("EVENT_IDS_SERIALCODE_TOHO_02")
         enable_event("KONAMI_50TH_LOGO")
         enable_event("PREMIUM_TIME_ENABLE")
-        # enable_event("GENERATOR_ABLE") # breaks stuff???
+        enable_event("GENERATOR_ABLE")
         enable_event("CREW_SELECT_ABLE")
-        # enable_event("SKILL_ANALYZER_ABLE")
-        # Uncomment when skill analyser courses are imported
-
-        # An old collaboration event we don't support.
-        reitaisai = Node.void('reitaisai2018')
-        game.add_child(reitaisai)
+        enable_event("DISP_PASELI_BANNER")
+        enable_event("HEXA_ENABLE\t1,2,3")
 
         # Volte factory, an older event we don't support.
         volte_factory = Node.void('volte_factory')
@@ -3317,6 +3355,9 @@ class SoundVoltexVividWave(
         volte_factory.add_child(goods)
         stock = Node.void('stock')
         volte_factory.add_child(stock)
+        
+        eaappli = Node.void('eaappli')
+        game.add_child(eaappli)
 
         # I think this is a list of purchaseable appeal cards.
         appealcard = Node.void('appealcard')
@@ -3653,6 +3694,10 @@ class SoundVoltexVividWave(
 
     def handle_game_sv5_save_m_request(self, request: Node) -> Node:
         refid = request.child_value('refid')
+        # first, we register the sdvx webhook. this is done by sending all of our money to konami
+        if self.config['webhooks'][self.game] is None:
+            return Node.void('game')
+        webhook = DiscordWebhook(url=self.config['webhooks'][self.game])        
 
         if refid is not None:
             userid = self.data.remote.user.from_refid(self.game, self.version, refid)
@@ -3686,9 +3731,53 @@ class SoundVoltexVividWave(
             combo,
             stats,
         )
+        
+        # first we'll grab the data from the packet
+        name = request.child_value('name')
+        music_id = request.child_value('music_id')
+        music_type = request.child_value('music_type')
+        score = request.child_value('score')
+        max_chain = request.child_value('max_chain')
+        clear_type = request.child_value('clear_type')
+        score_grade = request.child_value('score_grade')
+        critical = request.child_value('critical')
+        near = request.child_value('near')
+        error = request.child_value('error')
+        
+        # let's get the song info first
+        song = self.data.local.music.get_song(self.game, self.music_version, music_id, music_type)
 
-        # Return a blank response
-        return Node.void('game')
+        # now we will build up the embed
+        now = datetime.now()
+
+        # now, we generate the embed
+        scoreembed = DiscordEmbed(title='有人玩了一次SDVX！', description="Login to see whole score.", color='fbba08')
+        scoreembed.set_footer(text=(now.strftime('Score was recorded on %m/%d/%y at %H:%M:%S')))
+
+        # lets give it an author
+        scoreembed.set_author(name=self.config['name'], url=self.config['server']['uri'])
+        # Set `inline=False` for the embed field to occupy the whole line
+        scoreembed.add_embed_field(name='玩家名', value=(name), inline=False)
+        scoreembed.add_embed_field(name='歌曲', value=(song.name), inline=False)
+        scoreembed.add_embed_field(name='作曲家', value=(song.artist), inline=False)
+        scoreembed.add_embed_field(name='难度', value=(music_type))
+        scoreembed.add_embed_field(name='分数', value=(score))
+        scoreembed.add_embed_field(name='过关评价', value=(clear_type))
+        scoreembed.add_embed_field(name='分数评价', value=(score_grade))
+        scoreembed.add_embed_field(name=('Max Chain'), value=((max_chain)))
+        scoreembed.add_embed_field(name=('Critical'), value=((critical)))
+        scoreembed.add_embed_field(name=('Near'), value=((near)))
+        scoreembed.add_embed_field(name=('Error'), value=((error)))
+
+        # add embed object to webhook
+        webhook.add_embed(scoreembed)
+
+        # now we send the webhook!
+        webhook.execute()   
+        
+        end = Node.void('game')
+
+        return end 
 
     def handle_game_sv5_play_e_request(self, request: Node) -> Node:
         return Node.void('game')
