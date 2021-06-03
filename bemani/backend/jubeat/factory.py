@@ -10,6 +10,8 @@ from bemani.backend.jubeat.stubs import (
     JubeatCopious,
     JubeatCopiousAppend,
 )
+from bemani.backend.jubeat.knitappend import JubeatKnitAppend
+from bemani.backend.jubeat.copiousappend import JubeatCopiousAppend
 from bemani.backend.jubeat.saucer import JubeatSaucer
 from bemani.backend.jubeat.saucerfulfill import JubeatSaucerFulfill
 from bemani.backend.jubeat.prop import JubeatProp
