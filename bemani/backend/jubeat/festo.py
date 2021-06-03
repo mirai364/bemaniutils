@@ -47,7 +47,7 @@ class JubeatFesto(
             'enabled': False,
         },
         15: {
-            'enabled': True,
+            'enabled': False,
         },
         22: {
             'enabled': False,
@@ -84,7 +84,11 @@ class JubeatFesto(
     COURSE_HAZARD_FC1 = 4
     COURSE_HAZARD_FC2 = 5
     COURSE_HAZARD_FC3 = 6
-
+    
+    REWARD_TYPE_SONG = 1
+    REWARD_TYPE_TITLE = 2
+    REWARD_TYPE_EMO = 6
+    
     GAME_CHART_TYPE_BASIC = 0
     GAME_CHART_TYPE_ADVANCED = 1
     GAME_CHART_TYPE_EXTREME = 2
@@ -154,7 +158,79 @@ class JubeatFesto(
             # Mark that we did some actual work here.
             data.local.network.mark_scheduled(cls.game, cls.version, 'fc_challenge', 'daily')
         return events
-
+        
+    
+    # Hike event definitions
+    def __get_hikes(self) -> List[Dict[str, Any]]:
+        # Room definitions can be deduced here
+        # http://bemaniwiki.com/index.php?jubeat%20festo/jubeat%20%C2%E7%B2%F3%B8%DC%C5%B8
+        return [
+            {
+                'id': 1,
+                'term_list': [
+                    {
+                        'id': 1,
+                        'bgm_id': 90010024,
+                        'se_id': 1,
+                        'reward': 90000014,
+                    },
+                    {
+                        'id': 2,
+                        'bgm_id': 90010024,
+                        'se_id': 2,
+                        'reward': 90000012,
+                    },
+                    {
+                        'id': 3,
+                        'bgm_id': 90010024,
+                        'se_id': 3,
+                        'reward': 90000016,
+                    },
+                    {
+                        'id': 4,
+                        'bgm_id': 90010024,
+                        'se_id': 4,
+                        'reward': 90000013,
+                    },
+                    {
+                        'id': 5,
+                        'bgm_id': 90010024,
+                        'se_id': 5,
+                        'reward': 90000017,
+                    },
+                    {
+                        'id': 6,
+                        'bgm_id': 90010024,
+                        'se_id': 6,
+                        'reward': 90000011,
+                    },
+                    {
+                        'id': 7,
+                        'bgm_id': 90010024,
+                        'se_id': 7,
+                        'reward': 90000015,
+                    },
+                    {
+                        'id': 8,
+                        'bgm_id': 90010024,
+                        'se_id': 8,
+                        'reward': 90000018,
+                    },
+                    {
+                        'id': 9,
+                        'bgm_id': 90010024,
+                        'se_id': 9,
+                        'reward': 90000010,
+                    },
+                    {
+                        'id': 10,
+                        'bgm_id': 90010024,
+                        'se_id': 10,
+                        'reward': 90000047,
+                    },
+                ]
+            }
+        ]
     def __get_course_list(self) -> List[Dict[str, Any]]:
         # Full course list found at http://bemaniwiki.com/index.php?jubeat%20festo/TUNE%20RUN
         return [
@@ -165,11 +241,14 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 1,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 5000000,
+                'secret': False,
                 'score': 700000,
                 'music': [
-                    [(60000080, 0), (90000025, 0), (90000040, 0)],
-                    [(60000086, 0), (70000047, 0)],
-                    [(90000027, 0)],
+                    [(60000080, 0, False), (90000025, 0, False), (90000040, 0, False)],
+                    [(60000086, 0, False), (70000047, 0, False)],
+                    [(90000027, 0, False)],
                 ],
             },
             {
@@ -178,11 +257,14 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 1,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7915,
+                'secret': False,              
                 'score': 700000,
                 'music': [
-                    [(60000100, 0), (90000030, 0), (90000079, 0)],
-                    [(70000125, 0), (90000050, 0)],
-                    [(70000106, 0)],
+                    [(60000100, 0, False), (90000030, 0, False), (90000079, 0, False)],
+                    [(70000125, 0, False), (90000050, 0, False)],
+                    [(70000106, 0, True)],
                 ],
             },
             {
@@ -191,11 +273,14 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 2,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 5000000,
+                'secret': False,   
                 'score': 750000,
                 'music': [
-                    [(90000031, 0), (90000037, 0), (90000082, 0)],
-                    [(80000120, 0)],
-                    [(80000125, 0)],
+                    [(90000031, 0, False), (90000037, 0, False), (90000082, 0, False)],
+                    [(80000120, 0, False)],
+                    [(80000125, 0, False)],
                 ],
             },
             {
@@ -204,38 +289,47 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 2,
-                'score': 750000,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 5000000,
+                'secret': False,   
+                'score': 750000,                
                 'music': [
-                    [(90000040, 0), (50000296, 0), (90000044, 0)],
-                    [(90000033, 0), (90000039, 0)],
-                    [(80000091, 0)],
+                    [(90000040, 0, False), (50000296, 0, False), (90000044, 0, False)],
+                    [(90000033, 0, False), (90000039, 0, False)],
+                    [(80000091, 0, False)],
                 ],
-            },
+            },    
             {
                 'id': 5,
                 'name': '【二段】その笑顔は甘く蕩ける',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 3,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7916,
+                'secret': False,                   
                 'score': 800000,
                 'music': [
-                    [(50000268, 0), (70000039, 0), (90000051, 0)],
-                    [(70000091, 0), (70000042, 0)],
-                    [(60000053, 0)],
+                    [(50000268, 0, False), (70000039, 0, False), (90000051, 0, False)],
+                    [(70000091, 0, False), (70000042, 0, False)],
+                    [(60000053, 0, True)],
                 ],
             },
-            # KISAGO CUP
+             # KISAGO CUP
             {
                 'id': 11,
                 'name': '電脳享受空間',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 6000000,
+                'secret': False,                   
                 'score': 800000,
                 'music': [
-                    [(70000046, 1), (70000160, 1), (80000126, 1)],
-                    [(80000031, 1), (80000097, 1)],
-                    [(90000049, 1)],
+                    [(70000046, 1, False), (70000160, 1, False), (80000126, 1, False)],
+                    [(80000031, 1, False), (80000097, 1, False)],
+                    [(90000049, 1, False)],
                 ],
             },
             {
@@ -244,11 +338,14 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90001008,
+                'secret': True,                                  
                 'score': 850000,
                 'music': [
-                    [(50000202, 0), (70000117, 0), (70000134, 0)],
-                    [(50000212, 0), (80000124, 1)],
-                    [(90001008, 1)],
+                    [(50000202, 0, False), (70000117, 0, False), (70000134, 0, False)],
+                    [(50000212, 0, False), (80000124, 1, False)],
+                    [(90001008, 1, False)],
                 ],
             },
             {
@@ -257,24 +354,30 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 5,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 600000,
+                'secret': False,                                                
                 'score': 2600000,
                 'music': [
-                    [(50000242, 0), (90000037, 1)],
-                    [(50000260, 1), (50000261, 1)],
-                    [(90000081, 1)],
+                    [(50000242, 0, False), (90000037, 1, False)],
+                    [(50000260, 1, False), (50000261, 1, False)],
+                    [(90000081, 1, False)],
                 ],
             },
             {
                 'id': 14,
                 'name': '【三段】この花を貴方へ',
                 'course_type': self.COURSE_TYPE_PERMANENT,
-                'clear_type': self.COURSE_CLEAR_SCORE,
+                'clear_type': self.COURSE_CLEAR_SCORE,               
                 'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7917,
+                'secret': False,                                               
                 'score': 850000,
                 'music': [
-                    [(90000034, 1), (90000037, 1), (90000042, 1)],
-                    [(80000120, 1), (80001010, 1)],
-                    [(40000051, 1)],
+                    [(90000034, 1, False), (90000037, 1, False), (90000042, 1, False)],
+                    [(80000120, 1, False), (80001010, 1, False)],
+                    [(40000051, 1, True)],
                 ],
             },
             {
@@ -283,344 +386,738 @@ class JubeatFesto(
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 6,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7918,
+                'secret': False,                                               
                 'score': 2600000,
                 'music': [
-                    [(50000085, 2), (50000237, 2), (80000080, 2)],
-                    [(50000172, 2), (50000235, 2)],
-                    [(70000065, 2)],
+                    [(50000085, 2, False), (50000237, 2, False), (80000080, 2, False)],
+                    [(50000172, 2, False), (50000235, 2, False)],
+                    [(70000065, 2, True)],
                 ],
             },
-            # MURU CUP
             {
-                'id': 21,
-                'name': '黒船来航',
+                'id': 10,
+                'name': 'jubeat大回顧展 ROOM 1',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
-                'difficulty': 7,
-                'score': 850000,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000014,
+                'secret': False,                                                    
+                'score': 950000,
                 'music': [
-                    [(50000086, 2), (60000066, 2), (80000040, 1)],
-                    [(50000096, 2), (80000048, 2)],
-                    [(50000091, 2)],
+                    [(50000277, 0, False), (50000277, 1, False), (50000277, 2, False)],
+                    [(50000325, 0, False), (50000325, 1, False), (50000325, 2, False)],
+                    [(90000014, 0, False), (90000014, 1, False), (90000014, 2, False)],
+                ],
+            },
+            {
+                'id': 17,
+                'name': 'jubeat大回顧展 ROOM 2',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000012,
+                'secret': False,                                            
+                'score': 2750000,
+                'music': [
+                    [(30000048, 0, False), (30000048, 1, False), (30000048, 2, False)],
+                    [(30000121, 0, False), (30000121, 1, False), (30000121, 2, False)],
+                    [(90000012, 0, False), (90000012, 1, False), (90000012, 2, False)],
+                ],
+            },
+            {
+                'id': 18,
+                'name': 'jubeat大回顧展 ROOM 3',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000016,
+                'secret': False,                                               
+                'score': 925000,
+                'music': [
+                    [(60000007, 0, False), (60000007, 1, False), (60000007, 2, False)],
+                    [(60000070, 0, False), (60000070, 1, False), (60000070, 2, False)],
+                    [(90000016, 0, False), (90000016, 1, False), (90000016, 2, False)],
+                ],
+            },
+            {
+                'id': 19,
+                'name': 'jubeat大回顧展 ROOM 4',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000013,
+                'secret': False,                                             
+                'score': 2800000,
+                'music': [
+                    [(40000051, 0, False), (40000051, 1, False), (40000051, 2, False)],
+                    [(40000129, 0, False), (40000129, 1, False), (40000129, 2, False)],
+                    [(90000013, 0, False), (90000013, 1, False), (90000013, 2, False)],
+                ],
+            },
+            {
+                'id': 20,
+                'name': 'jubeat大回顧展 ROOM 5',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000017,
+                'secret': False,                                                    
+                'score': 2775000,
+                'music': [
+                    [(70000177, 0, False), (70000177, 1, False), (70000177, 2, False)],
+                    [(70000011, 0, False), (70000011, 1, False), (70000011, 2, False)],
+                    [(90000017, 0, False), (90000017, 1, False), (90000017, 2, False)],
+                ],
+            },
+            {
+                'id': 21,
+                'name': 'jubeat大回顧展 ROOM 6',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,             
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000011,     
+                'secret': False,                    
+                'score': 940000,
+                'music': [
+                    [(20000123, 0, False), (20000123, 1, False), (20000123, 2, False)],
+                    [(20000038, 0, False), (20000038, 1, False), (20000038, 2, False)],
+                    [(90000011, 0, False), (90000011, 1, False), (90000011, 2, False)],
                 ],
             },
             {
                 'id': 22,
-                'name': '【五段】濁流を乗り越えて',
+                'name': 'jubeat大回顧展 ROOM 7',
                 'course_type': self.COURSE_TYPE_PERMANENT,
-                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
-                'difficulty': 7,
-                'score': 2650000,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000015,     
+                'secret': False,                                    
+                'score': 950000,
                 'music': [
-                    [(50000343, 2), (60000060, 1), (60000071, 2)],
-                    [(60000027, 2), (80000048, 2)],
-                    [(20000038, 2)],
+                    [(50000021, 0, False), (50000021, 1, False), (50000021, 2, False)],
+                    [(50000078, 0, False), (50000078, 1, False), (50000078, 2, False)],
+                    [(90000015, 0, False), (90000015, 1, False), (90000015, 2, False)],
                 ],
             },
             {
                 'id': 23,
-                'name': 'のんびり。ゆったり。ほがらかに。',
+                'name': 'jubeat大回顧展 ROOM 8',
                 'course_type': self.COURSE_TYPE_PERMANENT,
-                'clear_type': self.COURSE_CLEAR_SCORE,
-                'difficulty': 8,
-                'score': 950000,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000018,     
+                'secret': False,                                              
+                'score': 2800000,
                 'music': [
-                    [(40000154, 2), (80000124, 1), (80000126, 2)],
-                    [(60000048, 2), (90000026, 2)],
-                    [(90000050, 2)],
+                    [(80000028, 0, False), (80000028, 1, False), (80000028, 2, False)],
+                    [(80000087, 0, False), (80000087, 1, False), (80000087, 2, False)],
+                    [(90000018, 0, False), (90000018, 1, False), (90000018, 2, False)],
                 ],
             },
             {
                 'id': 24,
+                'name': 'jubeat大回顧展 ROOM 9',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,                  
+                'difficulty': 4,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000010,     
+                'secret': False,                                                         
+                'score': 930000,
+                'music': [
+                    [(10000038, 0, False), (10000038, 1, False), (10000038, 2, False)],
+                    [(10000065, 0, False), (10000065, 1, False), (10000065, 2, False)],
+                    [(90000010, 0, False), (90000010, 1, False), (90000010, 2, False)],
+                ],
+            },
+            # MURU CUP
+            {
+                'id': 25,
+                'name': '雨上がりレインボー',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,  
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,                
+                'difficulty': 9,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 1000000,     
+                'secret': False,                                                         
+                'score': 2650000,
+                'music': [
+                    [(50000138, 2, False)],
+                    [(80000057, 2, False)],
+                    [(90000011, 2, False)],
+                ],
+            },    
+            {
+                'id': 26,
+                'name': 'Rain時々雨ノチ雨',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,  
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,           
+                'difficulty': 9,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 1000000,     
+                'secret': False,                                                         
+                'score': 2650000,
+                'music': [
+                    [(30000050, 2, False)],
+                    [(80000123, 2, False)],
+                    [(50000092, 2, False)],
+                ],
+            },             
+            {
+                'id': 28,
+                'name': '黒船来航',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'difficulty': 7,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 700000,     
+                'secret': False,              
+                'score': 850000,
+                'music': [
+                    [(50000086, 2, False), (60000066, 2, False), (80000040, 1, False)],
+                    [(50000096, 2, False), (80000048, 2, False)],
+                    [(50000091, 2, False)],
+                ],
+            },
+            {
+                'id': 29,
+                'name': '【五段】濁流を乗り越えて',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 7,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7919,     
+                'secret': False,                              
+                'score': 2650000,
+                'music': [
+                    [(50000343, 2, False), (60000060, 1, False), (60000071, 2, False)],
+                    [(60000027, 2, False), (80000048, 2, False)],
+                    [(20000038, 2, True)],
+                ],
+            },
+            {
+                'id': 30,
+                'name': 'のんびり。ゆったり。ほがらかに。',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'difficulty': 8,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 700000,     
+                'secret': False,                                              
+                'score': 950000,
+                'music': [
+                    [(40000154, 2, False), (80000124, 1, False), (80000126, 2, False)],
+                    [(60000048, 2, False), (90000026, 2, False)],
+                    [(90000050, 2, False)],
+                ],
+            },
+            {
+                'id': 31,
                 'name': '海・KOI・スィニョーレ！！',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 8,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 700000,     
+                'secret': False,                                                  
                 'score': 2650000,
                 'music': [
-                    [(50000201, 2)],
-                    [(50000339, 2)],
-                    [(50000038, 2)],
-                ],
-            },
-            {
-                'id': 25,
-                'name': '【六段】電柱を見ると思出す',
-                'course_type': self.COURSE_TYPE_PERMANENT,
-                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
-                'difficulty': 9,
-                'score': 2750000,
-                'music': [
-                    [(50000288, 2), (80000046, 2), (80001008, 2)],
-                    [(50000207, 2), (70000117, 2)],
-                    [(30000048, 2)],
-                ],
-            },
-            # SAZAE CUP
-            {
-                'id': 31,
-                'name': '超フェスタ！',
-                'course_type': self.COURSE_TYPE_PERMANENT,
-                'clear_type': self.COURSE_CLEAR_SCORE,
-                'difficulty': 10,
-                'score': 930000,
-                'music': [
-                    [(70000076, 2), (70000077, 2)],
-                    [(20000038, 2), (40000160, 2)],
-                    [(70000145, 2)],
+                    [(50000201, 2, False)],
+                    [(50000339, 2, False)],
+                    [(50000038, 2, False)],
                 ],
             },
             {
                 'id': 32,
+                'name': '【六段】電柱を見ると思出す',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'difficulty': 9,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7920,     
+                'secret': False,                                             
+                'score': 2750000,
+                'music': [
+                    [(50000288, 2, False), (80000046, 2, False), (80001008, 2, False)],
+                    [(50000207, 2, False), (70000117, 2, False)],
+                    [(30000048, 2, True)],
+                ],
+            },
+            # SAZAE CUP
+            {
+                'id': 38,
+                'name': '超フェスタ！',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'difficulty': 10,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 800000,     
+                'secret': False,                                                     
+                'score': 930000,
+                'music': [
+                    [(70000076, 2, False), (70000077, 2, False)],
+                    [(20000038, 2, False), (40000160, 2, False)],
+                    [(70000145, 2, False)],
+                ],
+            },
+            {
+                'id': 39,
                 'name': '【七段】操り人形はほくそ笑む',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 10,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7921,     
+                'secret': False,                                               
                 'score': 2800000,
                 'music': [
-                    [(70000006, 2), (70000171, 2), (80000003, 2)],
-                    [(50000078, 2), (50000324, 2)],
-                    [(80000118, 2)],
+                    [(70000006, 2, False), (70000171, 2, False), (80000003, 2, False)],
+                    [(50000078, 2, False), (50000324, 2, False)],
+                    [(80000118, 2, True)],
                 ],
             },
             {
-                'id': 33,
+                'id': 40,
                 'name': '絶体絶命スリーチャレンジ！',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_HAZARD,
                 'hazard_type': self.COURSE_HAZARD_FC3,
                 'difficulty': 11,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 800000,     
+                'secret': False,                                               
                 'score': 2800000,
                 'music': [
-                    [(50000238, 2), (70000003, 2), (90000051, 1)],
-                    [(50000027, 2), (50000387, 2)],
-                    [(80000056, 2)],
+                    [(50000238, 2, False), (70000003, 2, False), (90000051, 1, False)],
+                    [(50000027, 2, False), (50000387, 2, False)],
+                    [(80000056, 2, False)],
                 ],
             },
             {
-                'id': 34,
+                'id': 41,
                 'name': '天国の舞踏会',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 11,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90001007,     
+                'secret': True,                                                          
                 'score': 2800000,
                 'music': [
-                    [(60000065, 1)],
-                    [(80001007, 2)],
-                    [(90001007, 2)],
+                    [(60000065, 1, False)],
+                    [(80001007, 2, False)],
+                    [(90001007, 2, True)],
                 ],
             },
             {
-                'id': 35,
+                'id': 42,
                 'name': '【八段】山の賽子',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 12,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7922,     
+                'secret': False,                                                    
                 'score': 2820000,
                 'music': [
-                    [(50000200, 2), (50000291, 2), (60000003, 2)],
-                    [(50000129, 2), (80000021, 2)],
-                    [(80000087, 2)],
+                    [(50000200, 2, False), (50000291, 2, False), (60000003, 2, False)],
+                    [(50000129, 2, False), (80000021, 2, False)],
+                    [(80000087, 2, True)],
                 ],
             },
             # HOTATE CUP
             {
-                'id': 41,
+                'id': 47,
                 'name': 'The 8th KAC 個人部門',
                 'course_type': self.COURSE_TYPE_TIME_BASED,
                 'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'hard': True,
                 'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                                                   
                 'score': 700000,
                 'music': [
-                    [(90000052, 2)],
-                    [(90000013, 2)],
-                    [(70000167, 2)],
+                    [(90000052, 2, False)],
+                    [(90000013, 2, False)],
+                    [(70000167, 2, False)],
                 ],
             },
             {
-                'id': 42,
+                'id': 48,
                 'name': 'The 8th KAC 団体部門',
                 'course_type': self.COURSE_TYPE_TIME_BASED,
                 'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'hard': True,
                 'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
                 'score': 700000,
                 'music': [
-                    [(90000009, 2)],
-                    [(80000133, 2)],
-                    [(80000101, 2)],
+                    [(90000009, 2, False)],
+                    [(80000133, 2, False)],
+                    [(80000101, 2, False)],
                 ],
             },
             {
-                'id': 43,
+                'id': 49,
                 'name': 'BEMANI MASTER KOREA 2019',
                 'course_type': self.COURSE_TYPE_TIME_BASED,
                 'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'hard': True,
                 'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
                 'score': 700000,
                 'music': [
-                    [(90000003, 2)],
-                    [(80000090, 2)],
-                    [(90000009, 2)],
+                    [(90000003, 2, False)],
+                    [(80000090, 2, False)],
+                    [(90000009, 2, False)],
                 ],
             },
             {
-                'id': 44,
+                'id': 50,
+                'name': 'The 9th KAC 1st Stage 個人部門',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
+                'score': 700000,
+                'music': [
+                    [(90000125, 2, False)],
+                    [(60000065, 2, False)],
+                    [(90000023, 2, False)],
+                ],
+            },   
+            {
+                'id': 51,
+                'name': 'The 9th KAC 1st Stage 団体部門',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
+                'score': 700000,
+                'music': [
+                    [(90000125, 2, False)],
+                    [(50000135, 2, False)],
+                    [(90000045, 2, False)],
+                ],
+            },    
+            {
+                'id': 52,
+                'name': 'The 9th KAC 2nd Stage 個人部門',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
+                'score': 700000,
+                'music': [
+                    [(90000095, 2, False)],
+                    [(80000085, 2, False)],
+                    [(80000090, 2, False)],
+                ],
+            }, 
+            {
+                'id': 53,
+                'name': 'The 9th KAC 2nd Stage 団体部門',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                    
+                'score': 700000,
+                'music': [
+                    [(90000113, 2, False)],
+                    [(50000344, 2, False)],
+                    [(90000096, 2, False)],
+                ],
+            },  
+            {
+                'id': 54,
+                'name': 'The 10th KAC 1st Stage',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
+                'score': 700000,
+                'music': [
+                    [(90000003, 2, False)],
+                    [(90000151, 2, False)],
+                    [(90000174, 2, False)],
+                ],
+            },       
+            {
+                'id': 55,
+                'name': 'The 10th KAC 2nd Stage',
+                'course_type': self.COURSE_TYPE_TIME_BASED,
+                'end_time': Time.end_of_this_week() + Time.SECONDS_IN_WEEK,
+                'clear_type': self.COURSE_CLEAR_SCORE,
+                'hard': True,
+                'difficulty': 14,
+                'reward_type': 9,
+                'reward_value': 10,     
+                'secret': False,                     
+                'score': 700000,
+                'music': [
+                    [(90000121, 2, False)],
+                    [(90000113, 2, False)],
+                    [(90000124, 2, False)],
+                ],
+            },                 
+            {
+                'id': 60,
                 'name': '初めてのHARD MODE再び',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 13,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 900000,     
+                'secret': False,                                                          
                 'score': 2750000,
                 'music': [
-                    [(50000096, 2), (50000263, 2), (80000119, 2)],
-                    [(60000021, 2), (60000075, 2)],
-                    [(60000039, 2)],
+                    [(50000096, 2, False), (50000263, 2, False), (80000119, 2, False)],
+                    [(60000021, 2, False), (60000075, 2, False)],
+                    [(60000039, 2, False)],
                 ],
             },
             {
-                'id': 45,
+                'id': 61,
                 'name': '【九段】2人からの挑戦状',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 13,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7923,     
+                'secret': True,                                                  
                 'score': 2830000,
                 'music': [
-                    [(50000023, 2), (80000025, 2), (80000106, 2)],
-                    [(50000124, 2), (80000082, 2)],
-                    [(60000115, 2)],
+                    [(50000023, 2, False), (80000025, 2, False), (80000106, 2, False)],
+                    [(50000124, 2, False), (80000082, 2, False)],
+                    [(60000115, 2, True)],
                 ],
             },
             {
-                'id': 46,
+                'id': 62,
                 'name': '天空の庭　太陽の園',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'difficulty': 13,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 900000,     
+                'secret': False,                                                 
                 'score': 965000,
                 'music': [
-                    [(40000153, 2)],
-                    [(80000007, 2)],
-                    [(70000173, 2)],
+                    [(40000153, 2, False)],
+                    [(80000007, 2, False)],
+                    [(70000173, 2, False)],
                 ],
             },
             {
-                'id': 47,
+                'id': 63,
                 'name': '緊急！迅速！大混乱！',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'difficulty': 14,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 900000,     
+                'secret': False,                                                  
                 'score': 2900000,
                 'music': [
-                    [(20000040, 2), (50000244, 2), (70000145, 2)],
-                    [(40000046, 2), (50000158, 2)],
-                    [(40000057, 2)],
+                    [(20000040, 2, False), (50000244, 2, False), (70000145, 2, False)],
+                    [(40000046, 2, False), (50000158, 2, False)],
+                    [(40000057, 2, False)],
                 ],
             },
             {
-                'id': 48,
+                'id': 64,
                 'name': '【十段】時の超越者',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 14,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7924,     
+                'secret': False,              
                 'score': 2820000,
                 'music': [
-                    [(20000051, 2), (50000249, 2), (70000108, 2)],
-                    [(40000046, 2), (50000180, 2)],
-                    [(50000134, 2)],
+                    [(20000051, 2, False), (50000249, 2, False), (70000108, 2, False)],
+                    [(40000046, 2, False), (50000180, 2, False)],
+                    [(50000134, 2, True)],
                 ],
             },
+            {
+                'id': 65,
+                'name': 'jubeat大回顧展 ROOM 10',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'hard': True,
+                'difficulty': 13,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000047,     
+                'secret': True,                                 
+                'score': 2850000,
+                'music': [
+                    [(30000127, 2, True)],
+                    [(60000078, 2, True)],
+                    [(90000047, 2, True)],
+                ],
+            },            
             # OSHAKO CUP
             {
-                'id': 51,
+                'id': 70,
                 'name': '【皆伝】甘味なのに甘くない',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 15,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7925,     
+                'secret': False,                                                
                 'score': 2850000,
                 'music': [
-                    [(90000010, 2)],
-                    [(80000101, 2)],
-                    [(50000102, 2)],
+                    [(90000010, 2, True)],
+                    [(80000101, 2, True)],
+                    [(50000102, 2, True)],
                 ],
             },
             {
-                'id': 52,
+                'id': 71,
                 'name': '【伝導】真の青が魅せた空',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_SCORE,
                 'hard': True,
                 'difficulty': 15,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90001005,     
+                'secret': True,                                                    
                 'score': 970000,
                 'music': [
-                    [(50000332, 2)],
-                    [(70000098, 2)],
-                    [(90001005, 2)],
+                    [(50000332, 2, False)],
+                    [(70000098, 2, False)],
+                    [(90001005, 2, True)],
                 ],
             },
             {
-                'id': 53,
+                'id': 72,
                 'name': '豪華絢爛高揚絶頂',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 16,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 1000000,     
+                'secret': False,                                               
                 'score': 2960000,
                 'music': [
-                    [(10000065, 2)],
-                    [(50000323, 2)],
-                    [(50000208, 2)],
+                    [(10000065, 2, True)],
+                    [(50000323, 2, True)],
+                    [(50000208, 2, True)],
                 ],
             },
             {
-                'id': 54,
+                'id': 73,
                 'name': '絢爛豪華激情無常',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 16,
+                'reward_type': self.REWARD_TYPE_EMO,
+                'reward_value': 1000000,     
+                'secret': False,                                         
                 'score': 2960000,
                 'music': [
-                    [(60000010, 2)],
-                    [(70000110, 2)],
-                    [(90000047, 2)],
+                    [(60000010, 2, True)],
+                    [(70000110, 2, True)],
+                    [(90000047, 2, True)],
                 ],
             },
             {
-                'id': 55,
+                'id': 74,
                 'name': '【指神】王の降臨',
                 'course_type': self.COURSE_TYPE_PERMANENT,
                 'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
                 'hard': True,
                 'difficulty': 16,
+                'reward_type': self.REWARD_TYPE_TITLE,
+                'reward_value': 7926,     
+                'secret': False,                                               
                 'score': 2980000,
                 'music': [
-                    [(70000094, 2)],
-                    [(80000088, 2)],
-                    [(70000110, 2)],
+                    [(70000094, 2, True)],
+                    [(80000088, 2, True)],
+                    [(70000110, 2, True)],
                 ],
             },
+            {
+                'id': 75,
+                'name': '【伝導】1116全てを超越した日',
+                'course_type': self.COURSE_TYPE_PERMANENT,
+                'clear_type': self.COURSE_CLEAR_COMBINED_SCORE,
+                'hard': True,
+                'difficulty': 16,
+                'reward_type': self.REWARD_TYPE_SONG,
+                'reward_value': 90000057,     
+                'secret': True,                                               
+                'score': 2975000,
+                'music': [
+                    [(70000094, 2, True)],
+                    [(80000088, 2, True)],
+                    [(70000110, 2, True)],
+                ],
+            },           
         ]
-
+        
     def __get_global_info(self) -> Node:
         info = Node.void('info')
-
-        # Event info.
+        emo = Node.void('emo')
+        emo_list = Node.void('emo_list')
+        
+        # Event info
         event_info = Node.void('event_info')
         info.add_child(event_info)
         for event in self.EVENTS:
             evt = Node.void('event')
             event_info.add_child(evt)
             evt.set_attribute('type', str(event))
-            evt.add_child(Node.u8('state', self.EVENT_STATUS_OPEN if self.EVENTS[event]['enabled'] else 0))
-
+            evt.add_child(Node.u8('state', 0x1 if self.EVENTS[event]['enabled'] else 0x0))
+            
         genre_def_music = Node.void('genre_def_music')
         info.add_child(genre_def_music)
 
@@ -678,7 +1175,6 @@ class JubeatFesto(
                 -1, -1, -1, -1,
             ],
         ))
-
         info.add_child(Node.s32_array(
             'white_theme_list',
             [
@@ -692,22 +1188,22 @@ class JubeatFesto(
         info.add_child(Node.s32_array(
             'open_music_list',
             [
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
-                -1, -1, -1, -1,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
             ],
         ))
 
@@ -746,8 +1242,8 @@ class JubeatFesto(
                 0, 0, 0, 0,
                 0, 0, 0, 0,
                 0, -4194304, -2080769, -1,
-                -17, -2097155, -33574913, 2068709134,
-                32751, 0, 0, 0,
+                -17, -3, -1107316737, -419546,
+                142606319, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0,
@@ -778,6 +1274,7 @@ class JubeatFesto(
         #         <stime __type="str">start time?</stime>
         #         <etime __type="str">end time?</etime>
         #     </node>
+        
         collection = Node.void('collection')
         info.add_child(collection)
         collection.add_child(Node.void('rating_s'))
@@ -793,14 +1290,41 @@ class JubeatFesto(
         all_music_matching = Node.void('all_music_matching')
         info.add_child(all_music_matching)
         all_music_matching.add_child(Node.bool('is_available', True))
+        
         department = Node.void('department')
-        all_music_matching.add_child(department)
-        department.add_child(Node.void('pack_list'))
-
-        question_list = Node.void('question_list')
-        info.add_child(question_list)
-
-        # Set up TUNE RUN course requirements
+        info.add_child(department)
+        shop_list = Node.void('shop_list')
+        department.add_child(shop_list)        
+        shop = Node.void('shop')
+        shop_list.add_child(shop)
+        shop.set_attribute('id', '1')
+        shop.add_child(Node.s32('tex_id', 1))
+        shop.add_child(Node.s8('type', 2))
+        shop.add_child(Node.s32('emo_id', 2))
+        shop.add_child(Node.s32('priority', 1))
+        shop.add_child(Node.u64('etime', 2314255987000))
+        
+        item_list = Node.void('item_list')
+        shop_list.add_child(item_list)
+        item = Node.void('item')
+        item_list.add_child(item)
+        item.set_attribute('id', '1')
+        item.add_child(Node.s32('priority', 1))
+        item.add_child(Node.s32('price', 0))
+        item.add_child(Node.bool('is_secret', False))   
+        detail = Node.void('detail')      
+        
+        shop_1 = Node.void('shop')
+        shop_list.add_child(shop_1)
+        shop_1.set_attribute('id', '2')
+        shop_1.add_child(Node.s32('tex_id', 2))
+        shop_1.add_child(Node.s8('type', 2))
+        shop_1.add_child(Node.s32('emo_id', 1))
+        shop_1.add_child(Node.s32('priority', 2))
+        shop_1.add_child(Node.u64('etime', 1619316029000))
+        
+        
+       # Set up TUNE RUN course requirements
         clan_course_list = Node.void('course_list')
         info.add_child(clan_course_list)
 
@@ -844,12 +1368,12 @@ class JubeatFesto(
                 seq_list = Node.void('seq_list')
                 tune.add_child(seq_list)
 
-                for songid, chart in charts:
+                for songid, chart, secret in charts:
                     seq = Node.void('seq')
                     seq_list.add_child(seq)
                     seq.add_child(Node.s32('music_id', songid))
                     seq.add_child(Node.s32('difficulty', chart))
-                    seq.add_child(Node.bool('is_secret', False))  # TODO: make this an attribute in course definition
+                    seq.add_child(Node.bool('is_secret', secret))  # TODO: make this an attribute in course definition
 
             # Clear criteria
             clear = Node.void('clear')
@@ -860,13 +1384,32 @@ class JubeatFesto(
             ex_option.add_child(Node.s32('hazard_type', course['hazard_type'] if 'hazard_type' in course else 0))
             clear.set_attribute('type', str(course['clear_type']))
             clear.add_child(Node.s32('score', course['score'] if 'score' in course else 0))
-
+        
+            # Enable course reward list
             reward_list = Node.void('reward_list')
             clear.add_child(reward_list)
-        # add stuff for newer festo to boot
+            reward = Node.void('reward')
+            reward_list.add_child(reward)
+            reward.set_attribute('id', str(course['id']))
+            reward.add_child(Node.bool('is_secret', course['secret'] if 'secret' in course else False))
+            detail = Node.void('detail')
+            reward.add_child(detail)
+            detail.set_attribute('type', str(course['reward_type']))
+            detail.add_child(Node.s32('value', course['reward_value']))
+            detail.add_child(Node.bool('is_special', False))  
 
-        info.add_child(Node.void('share_music'))
-        info.add_child(Node.void('weekly_music'))
+        # add stuff for newer festo to boot
+        share_music = Node.void('share_music')
+        info.add_child(share_music)
+     
+        weekly_music = Node.void('weekly_music')
+        info.add_child(weekly_music)
+        
+        info.add_child(Node.void('question_list'))
+        qr = Node.void('qr')
+        info.add_child(qr)
+        qr.add_child(Node.s32('flag', 1))
+        
         info.add_child(Node.s32_array(
             'add_default_music_list',
             [
@@ -888,10 +1431,28 @@ class JubeatFesto(
                 0, 0, 0, 0,
             ],
         ))
-        info.add_child(Node.void('department'))
-        info.add_child(Node.void('team_battle'))
-        info.add_child(Node.void('emo_list'))
-        info.add_child(Node.void('tip_list'))
+        info.add_child(Node.void('department')) 
+        
+        team_battle = Node.void('team_battle')
+        info.add_child(team_battle)
+        
+        emo_list = Node.void('emo_list')
+        info.add_child(emo_list)
+        emo = Node.void('emo')
+        emo_list.add_child(emo)
+        emo.set_attribute('id', '1')
+        emo.add_child(Node.s32('tex_id', 1))
+        emo.add_child(Node.bool('is_exchange', False))
+        
+        emo_1 = Node.void('emo')
+        emo_list.add_child(emo_1)
+        emo_1.set_attribute('id', '2')
+        emo_1.add_child(Node.s32('tex_id', 2))
+        emo_1.add_child(Node.bool('is_exchange', False))
+        
+        tip_list = Node.void('tip_list')
+        info.add_child(tip_list)
+        
         return info
 
     def handle_shopinfo_regist_request(self, request: Node) -> Node:
@@ -924,19 +1485,60 @@ class JubeatFesto(
         return root
 
     def handle_demodata_get_jbox_list_request(self, request: Node) -> Node:
-        root = Node.void('demodata')
-        return root
+        demodata = Node.void('demodata')        
+        demodata.set_attribute('fault', '0')
+        demodata.set_attribute('status', '0')
+        selection_list = Node.void('selection_list')
+        demodata.add_child(selection_list)
+        selection = Node.void('selection')
+        selection_list.add_child(selection)
+        selection.set_attribute('id', '1')
+        selection.add_child(Node.string('name', '0'))
+        selection.add_child(Node.s32('image_id', 1))
+        selection.add_child(Node.s64('etime', 34687700616))
+        target_list = Node.void('target_list')
+        selection.add_child(target_list)
+        target = Node.void('target')
+        target_list.add_child(target)
+        target.set_attribute('id', '0')
+        target.add_child(Node.s32('appearlist', 1))
+        target.add_child(Node.s32('emblemlist', 1))
+        target.add_child(Node.s32('definedlist', 1))
+        target.add_child(Node.s32('rarity', 1))
+        target.add_child(Node.s32('rarity_special', 1))
+        
+        return demodata       
 
     def handle_jbox_get_agreement_request(self, request: Node) -> Node:
         root = Node.void('jbox')
         root.add_child(Node.bool('is_agreement', True))
         return root
-
-    def handle_jbox_get_list_request(self, request: Node) -> Node:
-        root = Node.void('jbox')
-        root.add_child(Node.void('selection_list'))
-        return root
-
+        
+    def handle_demodata_get_jbox_image_request(self, request: Node) -> Node:
+        demodata = Node.void('demodata')        
+        demodata.set_attribute('fault', '0')
+        demodata.set_attribute('status', '0')
+        selection_list = Node.void('selection_list')
+        demodata.add_child(selection_list)
+        selection = Node.void('selection')
+        selection_list.add_child(selection)
+        selection.set_attribute('id', '1')
+        selection.add_child(Node.string('name', '0'))
+        selection.add_child(Node.s32('image_id', 1))
+        selection.add_child(Node.s64('etime', 34687700616))
+        target_list = Node.void('target_list')
+        selection.add_child(target_list)
+        target = Node.void('target')
+        target_list.add_child(target)
+        target.set_attribute('id', '0')
+        target.add_child(Node.s32('appearlist', 1))
+        target.add_child(Node.s32('emblemlist', 1))
+        target.add_child(Node.s32('definedlist', 1))
+        target.add_child(Node.s32('rarity', 1))
+        target.add_child(Node.s32('rarity_special', 1))
+        
+        return demodata       
+    
     def handle_recommend_get_recommend_request(self, request: Node) -> Node:
         recommend = Node.void('recommend')
         data = Node.void('data')
@@ -1048,7 +1650,7 @@ class JubeatFesto(
             profile = None
 
         if userid is not None and profile is not None:
-            self.put_profile(userid, profile)
+            self.put_profile(userid, profile)      
 
         return Node.void('gameend')
 
@@ -1221,7 +1823,7 @@ class JubeatFesto(
         last.add_child(Node.string('areaname', lastdict.get_str('areaname')))
         last.add_child(Node.s32('music_id', lastdict.get_int('music_id')))
         last.add_child(Node.s8('seq_id', lastdict.get_int('seq_id')))
-        last.add_child(Node.string('seq_edit_id', '12345678'))
+        last.add_child(Node.string('seq_edit_id', lastdict.get_str('seq_edit_id')))
         last.add_child(Node.s8('sort', lastdict.get_int('sort')))
         last.add_child(Node.s8('category', lastdict.get_int('category')))
         last.add_child(Node.s8('expert_option', lastdict.get_int('expert_option')))
@@ -1242,20 +1844,20 @@ class JubeatFesto(
         # Secret unlocks
         item = Node.void('item')
         player.add_child(item)
-        item.add_child(Node.s32_array('music_list', profile.get_int_array('music_list', 64, [-1] * 64)))
-        item.add_child(Node.s32_array('secret_list', profile.get_int_array('secret_list', 64, [-1] * 64)))
+        item.add_child(Node.s32_array('music_list', profile.get_int_array('music_list', 64, [0] * 64)))
+        item.add_child(Node.s32_array('secret_list', profile.get_int_array('secret_list', 64, [0] * 64)))
         item.add_child(Node.s32_array('theme_list', profile.get_int_array('theme_list', 16, [-1] * 16)))
         item.add_child(Node.s32_array('marker_list', profile.get_int_array('marker_list', 16, [-1] * 16)))
-        item.add_child(Node.s32_array('title_list', profile.get_int_array('title_list', 160, [-1] * 160)))
-        item.add_child(Node.s32_array('parts_list', profile.get_int_array('parts_list', 160, [-1] * 160)))
-        item.add_child(Node.s32_array('emblem_list', profile.get_int_array('emblem_list', 96, [-1] * 96)))
+        item.add_child(Node.s32_array('title_list', profile.get_int_array('title_list', 160, [0] * 160)))
+        item.add_child(Node.s32_array('parts_list', profile.get_int_array('parts_list', 160, [0] * 160)))
+        item.add_child(Node.s32_array('emblem_list', profile.get_int_array('emblem_list', 96, [0] * 96)))
         item.add_child(Node.s32_array('commu_list', profile.get_int_array('commu_list', 16, [-1] * 16)))
 
         new = Node.void('new')
         item.add_child(new)
-        new.add_child(Node.s32_array('secret_list', profile.get_int_array('secret_list_new', 64, [-1] * 64)))
-        new.add_child(Node.s32_array('theme_list', profile.get_int_array('theme_list_new', 16, [-1] * 16)))
-        new.add_child(Node.s32_array('marker_list', profile.get_int_array('marker_list_new', 16, [-1] * 16)))
+        new.add_child(Node.s32_array('secret_list', profile.get_int_array('secret_list_new', 64, [0] * 64)))
+        new.add_child(Node.s32_array('theme_list', profile.get_int_array('theme_list_new', 16, [0] * 16)))
+        new.add_child(Node.s32_array('marker_list', profile.get_int_array('marker_list_new', 16, [0] * 16)))
 
         # Add rivals to profile.
         rivallist = Node.void('rivallist')
@@ -1319,7 +1921,7 @@ class JubeatFesto(
         player.add_child(official_news)
         news_list = Node.void('news_list')
         official_news.add_child(news_list)
-
+       
         # Sane defaults for unknown/who cares nodes
         history = Node.void('history')
         player.add_child(history)
@@ -1378,6 +1980,7 @@ class JubeatFesto(
 
         # New Music stuff
         new_music = Node.void('new_music')
+        new_music.add_child(Node.s32('music', 91000000))       
         player.add_child(new_music)
 
         navi = Node.void('navi')
@@ -1396,17 +1999,11 @@ class JubeatFesto(
         born = Node.void('born')
         player.add_child(born)
         born.add_child(Node.s8('status', profile.get_int('born_status')))
-        born.add_child(Node.s16('year', profile.get_int('born_year')))
+        born.add_child(Node.s16('year', profile.get_int('born_year')))      
 
         # More crap
         question_list = Node.void('question_list')
-        player.add_child(question_list)
-
-        # Union Battle
-        union_battle = Node.void('union_battle')
-        player.add_child(union_battle)
-        union_battle.set_attribute('id', "0")
-        union_battle.add_child(Node.s32("power", 0))
+        player.add_child(question_list)     
 
         # Some server node
         server = Node.void('server')
@@ -1415,13 +2012,18 @@ class JubeatFesto(
         # Another unknown gift list?
         eamuse_gift_list = Node.void('eamuse_gift_list')
         player.add_child(eamuse_gift_list)
+        
+        department = Node.void('department')
+        player.add_child(department)
+        shop_list = Node.void('shop_list')
+        department.add_child(shop_list) 
 
         category_list = Node.void('category_list')
         player.add_child(category_list)
 
         # Clan Course List Progress
         clan_course_list = Node.void('course_list')
-        player.add_child(clan_course_list)
+        player.add_child(clan_course_list)     
 
         # Each course that we have completed has one of the following nodes.
         for course in self.__get_course_list():
@@ -1443,43 +2045,6 @@ class JubeatFesto(
             category.set_attribute('id', str(categoryid))
             category.add_child(Node.bool('is_display', True))
 
-        # Drop list
-        drop_list = Node.void('drop_list')
-        player.add_child(drop_list)
-
-        dropachievements: Dict[int, Achievement] = {}
-        for achievement in achievements:
-            if achievement.type == 'drop':
-                dropachievements[achievement.id] = achievement
-
-        for dropid in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
-            if dropid in dropachievements:
-                dropdata = dropachievements[dropid].data
-            else:
-                dropdata = ValidatedDict()
-
-            drop = Node.void('drop')
-            drop_list.add_child(drop)
-            drop.set_attribute('id', str(dropid))
-            drop.add_child(Node.s32('exp', dropdata.get_int('exp', -1)))
-            drop.add_child(Node.s32('flag', dropdata.get_int('flag', 0)))
-
-            item_list = Node.void('item_list')
-            drop.add_child(item_list)
-
-            for itemid in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
-                item = Node.void('item')
-                item_list.add_child(item)
-                item.set_attribute('id', str(itemid))
-                item.add_child(Node.s32('num', dropdata.get_int(f'item_{itemid}')))
-
-        department = Node.void('department')
-        player.add_child(department)
-
-        # Emo node added in festo
-        emo_list = Node.void("emo_list")
-        player.add_child(emo_list)
-
         # Fill in category
         fill_in_category = Node.void('fill_in_category')
         player.add_child(fill_in_category)
@@ -1496,15 +2061,21 @@ class JubeatFesto(
         hard.add_child(Node.s32_array('all_yellow_flag_list', profile.get_int_array('hard_all_yellow_flag_list', 16, [0] * 16)))
         hard.add_child(Node.s32_array('full_combo_flag_list', profile.get_int_array('hard_full_combo_flag_list', 16, [0] * 16)))
         hard.add_child(Node.s32_array('excellent_flag_list', profile.get_int_array('hard_excellent_flag_list', 16, [0] * 16)))
-
-        # Daily Bonus
-        daily_bonus_list = Node.void('daily_bonus_list')
-        player.add_child(daily_bonus_list)
-
-        # Tickets
-        ticket_list = Node.void('ticket_list')
-        player.add_child(ticket_list)
-
+               
+        emo_list_1 = Node.void('emo_list')
+        player.add_child(emo_list_1)
+        emo_2 = Node.void('emo')
+        emo_list_1.add_child(emo_2)
+        emo_2.set_attribute('id', '1')
+        emo_2.add_child(Node.s32('num', profile.get_int('emo_1_num')))
+        emo_3 = Node.void('emo')
+        emo_list_1.add_child(emo_3)
+        emo_3.set_attribute('id', '2')
+        emo_3.add_child(Node.s32('num', profile.get_int('emo_l_num')))
+        
+        team_battle = Node.void('team_battle')
+        player.add_child(team_battle)
+        
         return root
 
     def unformat_profile(self, userid: UserID, request: Node, oldprofile: ValidatedDict) -> ValidatedDict:
@@ -1595,6 +2166,7 @@ class JubeatFesto(
             newprofile.replace_int_array('hard_all_yellow_flag_list', 16, fill_in_category_hard.child_value('all_yellow_flag_list'))
             newprofile.replace_int_array('hard_full_combo_flag_list', 16, fill_in_category_hard.child_value('full_combo_flag_list'))
             newprofile.replace_int_array('hard_excellent_flag_list', 16, fill_in_category_hard.child_value('excellent_flag_list'))
+            
         # jbox stuff
         jbox = player.child('jbox')
         jboxdict = newprofile.get_dict('jbox')
@@ -1747,7 +2319,8 @@ class JubeatFesto(
 
                 self.update_score(userid, timestamp, songid, chart, points, medal,
                                   combo, ghost, stats, music_rate)
-
+                                  
+     
         # Born stuff
         born = player.child('born')
         if born is not None:
