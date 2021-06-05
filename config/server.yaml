@@ -1,6 +1,8 @@
 database:
     # IP or DNS entry for MySQL instance
     address: "localhost"
+    # Port
+    port: "3306"
     # Database that will be used
     database: "bemani"
     # User who has full credentials to the above DB

@@ -61,7 +61,7 @@ class ImportBase:
         self.update = update
         self.no_combine = no_combine
         self.__config = config
-        self.__url = f"mysql://{config['database']['user']}:{config['database']['password']}@{config['database']['address']}/{config['database']['database']}?charset=utf8mb4"
+        self.__url = f"mysql://{config['database']['user']}:{config['database']['password']}@{config['database']['address']}:{config['database']['port']}/{config['database']['database']}?charset=utf8mb4"
         self.__engine = create_engine(self.__url)
         self.__sessionmanager = sessionmaker(self.__engine)
         self.__conn = self.__engine.connect()

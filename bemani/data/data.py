@@ -121,7 +121,7 @@ class Data:
 
     @classmethod
     def sqlalchemy_url(cls, config: Dict[str, Any]) -> str:
-        return f"mysql://{config['database']['user']}:{config['database']['password']}@{config['database']['address']}/{config['database']['database']}?charset=utf8mb4"
+        return f"mysql://{config['database']['user']}:{config['database']['password']}@{config['database']['address']}:{config['database']['port']}/{config['database']['database']}?charset=utf8mb4"
 
     @classmethod
     def create_engine(cls, config: Dict[str, Any]) -> Engine:
