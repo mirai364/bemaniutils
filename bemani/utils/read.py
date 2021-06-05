@@ -1597,8 +1597,10 @@ class ImportPopn(ImportBase):
                 # We only care about easy/normal/hyper/ex, so only provide mappings there
                 if chart in chart_map:
                     difficulty = song['difficulty']['standard'][chart_map[chart]]
+                    file = song['file']['standard'][chart_map[chart]]
                 else:
                     difficulty = 0
+                    file = ""
 
                 if self.no_combine or old_id is None:
                     # Insert original
@@ -1617,6 +1619,7 @@ class ImportPopn(ImportBase):
                     {
                         'category': str(song['folder']),
                         'difficulty': difficulty,
+                        'file': file,
                     },
                 )
             self.finish_batch()
