@@ -17,7 +17,25 @@ from .swf import (
     AP2ImageTag,
 )
 from .decompile import ByteCode
-from .types import Color, Matrix, Point, Rectangle, AP2Trigger, AP2Action, PushAction, StoreRegisterAction, StringConstant, Register, NULL, UNDEFINED, GLOBAL, ROOT, PARENT, THIS, CLIP
+from .types import (
+    Color,
+    Matrix,
+    Point,
+    Rectangle,
+    AP2Trigger,
+    AP2Action,
+    PushAction,
+    StoreRegisterAction,
+    StringConstant,
+    Register,
+    NULL,
+    UNDEFINED,
+    GLOBAL,
+    ROOT,
+    PARENT,
+    THIS,
+    CLIP,
+)
 from .geo import Shape, DrawParams
 from .util import VerboseOutput
 
@@ -379,11 +397,12 @@ MissingThis = object()
 
 
 class AFPRenderer(VerboseOutput):
-    def __init__(self, shapes: Dict[str, Shape] = {}, textures: Dict[str, Image.Image] = {}, swfs: Dict[str, SWF] = {}, single_threaded: bool = False) -> None:
+    def __init__(self, shapes: Dict[str, Shape] = {}, textures: Dict[str, Image.Image] = {}, swfs: Dict[str, SWF] = {}, single_threaded: bool = False, enable_aa: bool = False) -> None:
         super().__init__()
 
         # Options for rendering
         self.__single_threaded = single_threaded
+        self.__enable_aa = enable_aa
 
         # Library of shapes (draw instructions), textures (actual images) and swfs (us and other files for imports).
         self.shapes: Dict[str, Shape] = shapes
@@ -940,6 +959,7 @@ class AFPRenderer(VerboseOutput):
             257,
             mask.rectangle,
             single_threaded=self.__single_threaded,
+            enable_aa=False,
         )
 
         # Composite it onto the current mask.
@@ -952,6 +972,7 @@ class AFPRenderer(VerboseOutput):
             256,
             calculated_mask,
             single_threaded=self.__single_threaded,
+            enable_aa=False,
         )
 
     def __render_object(
@@ -985,16 +1006,13 @@ class AFPRenderer(VerboseOutput):
 
         # Render individual shapes if this is a sprite.
         if isinstance(renderable, PlacedClip):
+            new_only_depths: Optional[List[int]] = None
             if only_depths is not None:
                 if renderable.depth not in only_depths:
                     if renderable.depth != -1:
                         # Not on the correct depth plane.
                         return img
                     new_only_depths = only_depths
-                else:
-                    new_only_depths = None
-            else:
-                new_only_depths = None
 
             # This is a sprite placement reference. Make sure that we render lower depths
             # first, but preserved placed order as well.
@@ -1023,11 +1041,13 @@ class AFPRenderer(VerboseOutput):
                     print("WARNING: Unhandled UV coordinate color!")
 
                 texture = None
+                enable_aa = False
                 if params.flags & 0x2:
                     # We need to look up the texture for this.
                     if params.region not in self.textures:
                         raise Exception(f"Cannot find texture reference {params.region}!")
                     texture = self.textures[params.region]
+                    enable_aa = self.__enable_aa
 
                     if params.flags & 0x8:
                         # TODO: This texture gets further blended somehow? Not sure this is ever used.
@@ -1039,6 +1059,8 @@ class AFPRenderer(VerboseOutput):
                         # of a rectangle, but let's assume that doesn't happen for now.
                         if len(shape.vertex_points) != 4:
                             print("WARNING: Unsupported non-rectangle shape!")
+                        if params.blend is None:
+                            raise Exception("Logic error, rectangle without a blend color!")
 
                         x_points = set(p.x for p in shape.vertex_points)
                         y_points = set(p.y for p in shape.vertex_points)
@@ -1064,7 +1086,7 @@ class AFPRenderer(VerboseOutput):
                     texture = shape.rectangle
 
                 if texture is not None:
-                    img = affine_composite(img, add_color, mult_color, transform, mask, blend, texture, single_threaded=self.__single_threaded)
+                    img = affine_composite(img, add_color, mult_color, transform, mask, blend, texture, single_threaded=self.__single_threaded, enable_aa=enable_aa)
         elif isinstance(renderable, PlacedImage):
             if only_depths is not None and renderable.depth not in only_depths:
                 # Not on the correct depth plane.
@@ -1072,7 +1094,7 @@ class AFPRenderer(VerboseOutput):
 
             # This is a shape draw reference.
             texture = self.textures[renderable.source.reference]
-            img = affine_composite(img, add_color, mult_color, transform, mask, blend, texture, single_threaded=self.__single_threaded)
+            img = affine_composite(img, add_color, mult_color, transform, mask, blend, texture, single_threaded=self.__single_threaded, enable_aa=self.__enable_aa)
         elif isinstance(renderable, PlacedDummy):
             # Nothing to do!
             pass
@@ -1384,10 +1406,9 @@ class AFPRenderer(VerboseOutput):
         actual_add_color = Color(0.0, 0.0, 0.0, 0.0)
         actual_blend = 0
 
+        max_frame: Optional[int] = None
         if only_frames:
             max_frame = max(only_frames)
-        else:
-            max_frame = None
 
         # Now play the frames of the root clip.
         try:

@@ -523,6 +523,7 @@ def render_path(
     output: str,
     *,
     disable_threads: bool = False,
+    enable_anti_aliasing: bool = False,
     background_color: Optional[str] = None,
     background_image: Optional[str] = None,
     force_aspect_ratio: Optional[str] = None,
@@ -532,7 +533,7 @@ def render_path(
     only_frames: Optional[str] = None,
     verbose: bool = False,
 ) -> int:
-    renderer = AFPRenderer(single_threaded=disable_threads)
+    renderer = AFPRenderer(single_threaded=disable_threads, enable_aa=enable_anti_aliasing)
     load_containers(renderer, containers, need_extras=True, verbose=verbose)
 
     # Verify the correct params.
@@ -641,13 +642,11 @@ def render_path(
                 movie_transform=transform,
             )
         )
-        if len(images) == 0:
-            raise Exception("Did not render any frames!")
+        if len(images) > 0:
+            with open(output, "wb") as bfp:
+                images[0].save(bfp, format=fmt, save_all=True, append_images=images[1:], duration=duration, optimize=True)
 
-        with open(output, "wb") as bfp:
-            images[0].save(bfp, format=fmt, save_all=True, append_images=images[1:], duration=duration, optimize=True)
-
-        print(f"Wrote animation to {output}")
+            print(f"Wrote animation to {output}")
     else:
         # Write all the frames out in individual_files.
         filename = output[:-4]
@@ -919,6 +918,11 @@ def main() -> int:
         help="Disable multi-threaded rendering.",
     )
     render_parser.add_argument(
+        "--enable-anti-aliasing",
+        action="store_true",
+        help="Enable experimental anti-aliased rendering.",
+    )
+    render_parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -982,6 +986,7 @@ def main() -> int:
             args.path,
             args.output,
             disable_threads=args.disable_threads,
+            enable_anti_aliasing=args.enable_anti_aliasing,
             background_color=args.background_color,
             background_image=args.background_image,
             force_aspect_ratio=args.force_aspect_ratio,

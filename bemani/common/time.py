@@ -2,7 +2,7 @@ import calendar
 import datetime
 from dateutil import tz
 
-from typing import List, Optional
+from typing import List, Final, Optional
 
 
 class Time:
@@ -11,10 +11,10 @@ class Time:
     standard unix timestamps at UTC timezone given various parameters.
     """
 
-    SECONDS_IN_MINUTE = 60
-    SECONDS_IN_HOUR = 3600
-    SECONDS_IN_DAY = 86400
-    SECONDS_IN_WEEK = 604800
+    SECONDS_IN_MINUTE: Final[int] = 60
+    SECONDS_IN_HOUR: Final[int] = 3600
+    SECONDS_IN_DAY: Final[int] = 86400
+    SECONDS_IN_WEEK: Final[int] = 604800
 
     @staticmethod
     def now() -> int:
@@ -33,7 +33,7 @@ class Time:
             now.year,
             now.month,
             now.day,
-            tzinfo=tz.tzutc()  # type: ignore
+            tzinfo=tz.tzutc()
         )
         end_of_day = beginning_of_day + datetime.timedelta(days=1)
         return calendar.timegm(end_of_day.timetuple())
@@ -48,7 +48,7 @@ class Time:
             now.year,
             now.month,
             now.day,
-            tzinfo=tz.tzutc()  # type: ignore
+            tzinfo=tz.tzutc()
         )
         return calendar.timegm(beginning_of_day.timetuple())
 
@@ -58,7 +58,7 @@ class Time:
         Returns the unix timestamp for the end of this week in UTC timezone.
         """
         now = datetime.datetime.utcnow().date()
-        this_week = now - datetime.timedelta(days=now.timetuple().tm_wday)  # type: ignore
+        this_week = now - datetime.timedelta(days=now.timetuple().tm_wday)
         next_week = this_week + datetime.timedelta(days=7)
         return calendar.timegm(next_week.timetuple())
 
@@ -68,7 +68,7 @@ class Time:
         Returns the unix timestamp for the beginning of this week in UTC timezone.
         """
         now = datetime.datetime.utcnow().date()
-        this_week = now - datetime.timedelta(days=now.timetuple().tm_wday)  # type: ignore
+        this_week = now - datetime.timedelta(days=now.timetuple().tm_wday)
         return calendar.timegm(this_week.timetuple())
 
     @staticmethod
@@ -117,7 +117,7 @@ class Time:
             date = datetime.datetime.utcnow().date()
         else:
             date = datetime.datetime.utcfromtimestamp(timestamp).date()
-        week = date - datetime.timedelta(days=date.timetuple().tm_wday)  # type: ignore
+        week = date - datetime.timedelta(days=date.timetuple().tm_wday)
         return (week - datetime.date(1970, 1, 1)).days
 
     @staticmethod
@@ -131,7 +131,7 @@ class Time:
             date = datetime.datetime.utcnow().date().timetuple()
         else:
             date = datetime.datetime.utcfromtimestamp(timestamp).date().timetuple()
-        return [date.tm_year, date.tm_yday]  # type: ignore
+        return [date.tm_year, date.tm_yday]
 
     @staticmethod
     def days_into_week(timestamp: Optional[int]=None) -> int:
@@ -144,7 +144,7 @@ class Time:
             date = datetime.datetime.utcnow().date().timetuple()
         else:
             date = datetime.datetime.utcfromtimestamp(timestamp).date().timetuple()
-        return date.tm_wday  # type: ignore
+        return date.tm_wday
 
     @staticmethod
     def timestamp_from_date(year: int, month: int=1, day: int=1) -> int:
@@ -164,7 +164,7 @@ class Time:
             year,
             month,
             day,
-            tzinfo=tz.tzutc()  # type: ignore
+            tzinfo=tz.tzutc()
         )
         return calendar.timegm(date.timetuple())
 

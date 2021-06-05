@@ -19,7 +19,7 @@ Note that this is NOT keyed by game song id and chart, but by an internal musici
 managed by the music table. This is so we can support keeping the same score across
 multiple games, even if the game changes the ID it refers to the song by.
 """
-score = Table(  # type: ignore
+score = Table(
     'score',
     metadata,
     Column('id', Integer, nullable=False, primary_key=True),
@@ -39,7 +39,7 @@ Table for storing score history for a particular game. Every entry that is store
 or updated in score will be written into this table as well, for looking up history
 over time.
 """
-score_history = Table(  # type: ignore
+score_history = Table(
     'score_history',
     metadata,
     Column('id', Integer, nullable=False, primary_key=True),
@@ -63,7 +63,7 @@ NOTE that it is expected to see the same songid/chart present multiple times as 
 as the game version changes. In this way, a song which is in multiple versions of
 the game can be found when playing each version.
 """
-music = Table(  # type: ignore
+music = Table(
     'music',
     metadata,
     Column('id', Integer, nullable=False, index=True),
@@ -447,12 +447,11 @@ class MusicData(BaseData):
             "SELECT music.songid AS songid, COUNT(score_history.timestamp) AS plays FROM score_history, music " +
             "WHERE score_history.musicid = music.id AND music.game = :game AND music.version = :version "
         )
+        timestamp: Optional[int] = None
         if days is not None:
             # Only select the last X days of hit chart
             sql = sql + "AND score_history.timestamp > :timestamp "
             timestamp = Time.now() - (Time.SECONDS_IN_DAY * days)
-        else:
-            timestamp = None
 
         sql = sql + "GROUP BY songid ORDER BY plays DESC LIMIT :count"
         cursor = self.execute(sql, {'game': game, 'version': version, 'count': count, 'timestamp': timestamp})

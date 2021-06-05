@@ -2,7 +2,7 @@ import multiprocessing
 from PIL import Image  # type: ignore
 from typing import Optional, Tuple
 
-from .types.generic import Color, Matrix, Point
+from ..types import Color, Matrix, Point
 
 cdef extern struct floatcolor_t:
     float r;
@@ -38,7 +38,8 @@ cdef extern int affine_composite_fast(
     unsigned char *texdata,
     unsigned int texwidth,
     unsigned int texheight,
-    unsigned int threads
+    unsigned int threads,
+    unsigned int enable_aa,
 )
 
 def affine_composite(
@@ -50,6 +51,7 @@ def affine_composite(
     blendfunc: int,
     texture: Image.Image,
     single_threaded: bool = False,
+    enable_aa: bool = True,
 ) -> Image.Image:
     # Calculate the inverse so we can map canvas space back to texture space.
     try:
@@ -125,9 +127,13 @@ def affine_composite(
         texwidth,
         texheight,
         threads,
+        1 if enable_aa else 0,
     )
     if errors != 0:
         raise Exception("Error raised in C++!")
 
-    # We blitted in-place, return that.
-    return Image.frombytes('RGBA', (imgwidth, imgheight), imgbytes)
+    # We blitted in-place, return that. There seems to be a reference bug in Cython
+    # when called from compiled mypyc code, so if we don't assign to a local variable
+    # first this function appears to return None.
+    img = Image.frombytes('RGBA', (imgwidth, imgheight), imgbytes)
+    return img

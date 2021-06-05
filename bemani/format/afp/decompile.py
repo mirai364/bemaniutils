@@ -8,10 +8,6 @@ from .types import (
     PushAction,
     AddNumVariableAction,
     AddNumRegisterAction,
-    Expression,
-    Register,
-    GenericObject,
-    StringConstant,
     InitRegisterAction,
     StoreRegisterAction,
     DefineFunction2Action,
@@ -19,8 +15,58 @@ from .types import (
     WithAction,
     GetURL2Action,
     StartDragAction,
+    Expression,
+    StringConstant,
+    ArithmeticExpression,
+    MethodCall,
+    FunctionCall,
+    GetTimeFunctionCall,
+    GetPathFunctionCall,
+    Variable,
+    Member,
+    NewFunction,
+    NewObject,
+    Array,
+    Object,
+    NotExpression,
     UNDEFINED,
     GLOBAL,
+    object_ref,
+    ConvertedAction,
+    Statement,
+    NopStatement,
+    StopMovieStatement,
+    PlayMovieStatement,
+    GotoFrameStatement,
+    GetURL2Statement,
+    NextFrameStatement,
+    PreviousFrameStatement,
+    StopSoundStatement,
+    CloneSpriteStatement,
+    RemoveSpriteStatement,
+    DebugTraceStatement,
+    IfStatement,
+    DoWhileStatement,
+    WhileStatement,
+    ForStatement,
+    BreakStatement,
+    ContinueStatement,
+    ReturnStatement,
+    NullReturnStatement,
+    ThrowStatement,
+    GotoStatement,
+    DefineLabelStatement,
+    SetVariableStatement,
+    DeleteVariableStatement,
+    SetMemberStatement,
+    DeleteMemberStatement,
+    SetLocalStatement,
+    StoreRegisterStatement,
+    ExpressionStatement,
+    IfExpr,
+    IsUndefinedIf,
+    IsBooleanIf,
+    TwoParameterIf,
 )
 from .util import VerboseOutput
 
@@ -127,9 +173,22 @@ class IfResult:
         return (self.stmt_id * 2) + (1 if self.path else 0)
 
 
-class ConvertedAction:
-    # An action that has been analyzed and converted to an intermediate representation.
-    pass
+class TempVariable(Variable):
+    # This is solely for recognizing when a stack which is being reconciled already has
+    # a variable.
+    def __repr__(self) -> str:
+        return f"TempVariable({self.name})"
+
+
+class MaybeStackEntry(Expression):
+    def __init__(self, parent_stack_id: int) -> None:
+        self.parent_stack_id = parent_stack_id
+
+    def __repr__(self) -> str:
+        return f"MaybeStackEntry({self.parent_stack_id})"
+
+    def render(self, parent_prefix: str, nested: bool = False) -> str:
+        raise Exception("Logic error, a MaybeStackEntry should never make it to the render stage!")
 
 
 class MultiAction(ConvertedAction):
@@ -143,874 +202,7 @@ class MultiAction(ConvertedAction):
         return f"MultiAction({self.actions})"
 
 
-class Statement(ConvertedAction):
-    # This is just a type class for finished statements.
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        raise NotImplementedError(f"{self.__class__.__name__} does not implement render()!")
-
-
-def object_ref(obj: Any, parent_prefix: str, verbose: bool=False) -> str:
-    if isinstance(obj, (GenericObject, Variable, TempVariable, Member, MethodCall, FunctionCall, Register)):
-        return obj.render(parent_prefix, verbose=verbose, nested=True)
-    else:
-        raise Exception(f"Unsupported objectref {obj} ({type(obj)})")
-
-
-def value_ref(param: Any, parent_prefix: str, verbose: bool=False, parens: bool = False) -> str:
-    if isinstance(param, StringConstant):
-        # Treat this as a string constant.
-        return repr(param.render(parent_prefix, verbose=verbose))
-    elif isinstance(param, Expression):
-        return param.render(parent_prefix, verbose=verbose, nested=parens)
-    elif isinstance(param, (str, int, float)):
-        return repr(param)
-    else:
-        raise Exception(f"Unsupported valueref {param} ({type(param)})")
-
-
-def name_ref(param: Any, parent_prefix: str, verbose: bool=False) -> str:
-    # Reference a name, so strings should not be quoted.
-    if isinstance(param, str):
-        return param
-    elif isinstance(param, StringConstant):
-        return param.render(parent_prefix, verbose=verbose)
-    else:
-        raise Exception(f"Unsupported nameref {param} ({type(param)})")
-
-
 ArbitraryOpcode = Union[AP2Action, ConvertedAction]
-
-
-class DefineLabelStatement(Statement):
-    def __init__(self, location: int) -> None:
-        self.location = location
-
-    def __repr__(self) -> str:
-        return f"label_{self.location}:"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"label_{self.location}:"]
-
-
-class BreakStatement(Statement):
-    # A break from a loop (forces execution to the next line after the loop).
-    def __repr__(self) -> str:
-        return "break"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}break;"]
-
-
-class ContinueStatement(Statement):
-    # A continue in a loop (forces execution to the top of the loop).
-    def __repr__(self) -> str:
-        return "continue"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}continue;"]
-
-
-class GotoStatement(Statement):
-    # A goto, including the ID of the chunk we want to jump to.
-    def __init__(self, location: int) -> None:
-        if location < 0:
-            raise Exception(f"Logic error, attempting to go to artificially inserted location {location}!")
-
-        self.location = location
-
-    def __repr__(self) -> str:
-        return f"goto label_{self.location}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}goto label_{self.location};"]
-
-
-class NullReturnStatement(Statement):
-    # A statement which directs the control flow to the end of the code, but
-    # does not pop the stack to return
-    def __repr__(self) -> str:
-        return "return"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}return;"]
-
-
-class ReturnStatement(Statement):
-    # A statement which directs the control flow to the end of the code,
-    # returning the top of the stack.
-    def __init__(self, ret: Any) -> None:
-        self.ret = ret
-
-    def __repr__(self) -> str:
-        ret = value_ref(self.ret, "")
-        return f"return {ret}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        ret = value_ref(self.ret, prefix, verbose=verbose)
-        return [f"{prefix}return {ret};"]
-
-
-class ThrowStatement(Statement):
-    # A statement which raises an exception. It appears that there is no
-    # 'catch' in this version of bytecode so it must be used only as an
-    # assert.
-    def __init__(self, exc: Any) -> None:
-        self.exc = exc
-
-    def __repr__(self) -> str:
-        exc = value_ref(self.exc, "")
-        return f"throw {exc}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        exc = value_ref(self.exc, prefix, verbose=verbose)
-        return [f"{prefix}throw {exc};"]
-
-
-class NopStatement(Statement):
-    # A literal no-op. We will get rid of these in an optimizing pass.
-    def __repr__(self) -> str:
-        return "nop"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        # We should never render this!
-        raise Exception("Logic error, a NopStatement should never make it to the render stage!")
-
-
-class ExpressionStatement(Statement):
-    # A statement which is an expression that discards its return.
-    def __init__(self, expr: Expression) -> None:
-        self.expr = expr
-
-    def __repr__(self) -> str:
-        return f"{self.expr.render('')}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}{self.expr.render(prefix, verbose=verbose)};"]
-
-
-class StopSoundStatement(Statement):
-    # Stop all sounds, this is an actionscript-specific opcode.
-    def __repr__(self) -> str:
-        return "builtin_StopAllSounds()"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}builtin_StopAllSounds();"]
-
-
-class StopMovieStatement(Statement):
-    # Stop the movie, this is an actionscript-specific opcode.
-    def __repr__(self) -> str:
-        return "builtin_StopPlaying()"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}builtin_StopPlaying();"]
-
-
-class PlayMovieStatement(Statement):
-    # Play the movie, this is an actionscript-specific opcode.
-    def __repr__(self) -> str:
-        return "builtin_StartPlaying()"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}builtin_StartPlaying();"]
-
-
-class NextFrameStatement(Statement):
-    # Advance to the next frame, this is an actionscript-specific opcode.
-    def __repr__(self) -> str:
-        return "builtin_GotoNextFrame()"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}builtin_GotoNextFrame();"]
-
-
-class PreviousFrameStatement(Statement):
-    # Advance to the previous frame, this is an actionscript-specific opcode.
-    def __repr__(self) -> str:
-        return "builtin_GotoPreviousFrame()"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        return [f"{prefix}builtin_GotoPreviousFrame();"]
-
-
-class DebugTraceStatement(Statement):
-    # Print a debug trace if supported.
-    def __init__(self, trace: Any) -> None:
-        self.trace = trace
-
-    def __repr__(self) -> str:
-        trace = value_ref(self.trace, "")
-        return f"builtin_DebugTrace({trace})"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        trace = value_ref(self.trace, prefix, verbose=verbose)
-        return [f"{prefix}builtin_DebugTrace({trace});"]
-
-
-class GotoFrameStatement(Statement):
-    # Go to a specified frame in the animation.
-    def __init__(self, frame: Any) -> None:
-        self.frame = frame
-
-    def __repr__(self) -> str:
-        frame = value_ref(self.frame, "")
-        return f"builtin_GotoFrame({frame})"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        frame = value_ref(self.frame, prefix, verbose=verbose)
-        return [f"{prefix}builtin_GotoFrame({frame});"]
-
-
-class CloneSpriteStatement(Statement):
-    # Clone a sprite.
-    def __init__(self, obj_to_clone: Any, name: Union[str, Expression], depth: Union[int, Expression]) -> None:
-        self.obj_to_clone = obj_to_clone
-        self.name = name
-        self.depth = depth
-
-    def __repr__(self) -> str:
-        obj = object_ref(self.obj_to_clone, "")
-        name = value_ref(self.name, "")
-        depth = value_ref(self.depth, "")
-        return f"builtin_CloneSprite({obj}, {name}, {depth})"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        obj = object_ref(self.obj_to_clone, prefix, verbose=verbose)
-        name = value_ref(self.name, prefix, verbose=verbose)
-        depth = value_ref(self.depth, prefix, verbose=verbose)
-        return [f"{prefix}builtin_CloneSprite({obj}, {name}, {depth});"]
-
-
-class RemoveSpriteStatement(Statement):
-    # Clone a sprite.
-    def __init__(self, obj_to_remove: Any) -> None:
-        self.obj_to_remove = obj_to_remove
-
-    def __repr__(self) -> str:
-        obj = object_ref(self.obj_to_remove, "")
-        return f"builtin_RemoveSprite({obj})"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        obj = object_ref(self.obj_to_remove, prefix, verbose=verbose)
-        return [f"{prefix}builtin_RemoveSprite({obj});"]
-
-
-class GetURL2Statement(Statement):
-    # Load the URL given in the parameters, with any possible target.
-    def __init__(self, action: int, url: Any, target: Any) -> None:
-        self.action = action
-        self.url = url
-        self.target = target
-
-    def __repr__(self) -> str:
-        url = value_ref(self.url, "")
-        target = value_ref(self.target, "")
-        return f"builtin_GetURL2({self.action}, {url}, {target})"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        url = value_ref(self.url, prefix, verbose=verbose)
-        target = value_ref(self.target, prefix, verbose=verbose)
-        return [f"{prefix}builtin_GetURL2({self.action}, {url}, {target});"]
-
-
-class MaybeStackEntry(Expression):
-    def __init__(self, parent_stack_id: int) -> None:
-        self.parent_stack_id = parent_stack_id
-
-    def __repr__(self) -> str:
-        return f"MaybeStackEntry({self.parent_stack_id})"
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        raise Exception("Logic error, a MaybeStackEntry should never make it to the render stage!")
-
-
-class ArithmeticExpression(Expression):
-    def __init__(self, left: Any, op: str, right: Any) -> None:
-        self.left = left
-        self.op = op
-        self.right = right
-
-    def __repr__(self) -> str:
-        left = value_ref(self.left, "", parens=True)
-        right = value_ref(self.right, "", parens=True)
-        return f"{left} {self.op} {right}"
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        left = value_ref(self.left, parent_prefix, parens=True, verbose=verbose)
-        right = value_ref(self.right, parent_prefix, parens=True, verbose=verbose)
-
-        if nested and self.op == '-':
-            return f"({left} {self.op} {right})"
-        else:
-            return f"{left} {self.op} {right}"
-
-
-class NotExpression(Expression):
-    def __init__(self, obj: Any) -> None:
-        self.obj = obj
-
-    def __repr__(self) -> str:
-        obj = value_ref(self.obj, "", parens=True)
-        return f"not {obj}"
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        obj = value_ref(self.obj, parent_prefix, parens=True, verbose=verbose)
-        return f"not {obj}"
-
-
-class Array(Expression):
-    # Call a method on an object.
-    def __init__(self, params: List[Any]) -> None:
-        self.params = params
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        params = [value_ref(param, parent_prefix, verbose=verbose) for param in self.params]
-        return f"[{', '.join(params)}]"
-
-
-class Object(Expression):
-    # Call a method on an object.
-    def __init__(self, params: Dict[Any, Any]) -> None:
-        self.params = params
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        params = [f"{value_ref(key, parent_prefix, verbose=verbose)}: {value_ref(val, parent_prefix, verbose=verbose)}" for (key, val) in self.params.items()]
-        lpar = "{"
-        rpar = "}"
-
-        return f"{lpar}{', '.join(params)}{rpar}"
-
-
-class FunctionCall(Expression):
-    # Call a method on an object.
-    def __init__(self, insertion_ref: int, name: Union[str, StringConstant], params: List[Any]) -> None:
-        self.insertion_ref = insertion_ref
-        self.name = name
-        self.params = params
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        name = name_ref(self.name, parent_prefix, verbose=verbose)
-        params = [value_ref(param, parent_prefix, verbose=verbose) for param in self.params]
-        return f"{name}({', '.join(params)})"
-
-
-class GetTimeFunctionCall(FunctionCall):
-    # Call the built-in 'get time' method which returns the current playback position.
-    def __init__(self, insertion_ref: int) -> None:
-        super().__init__(insertion_ref, "builtin_GetCurrentPlaybackPosition", [])
-
-
-class GetPathFunctionCall(FunctionCall):
-    # Call the built-in 'get time' method which returns the current playback position.
-    def __init__(self, insertion_ref: int, movieclip: Any) -> None:
-        super().__init__(insertion_ref, "builtin_GetPathOfMovie", [movieclip])
-
-
-class MethodCall(Expression):
-    # Call a method on an object.
-    def __init__(self, insertion_ref: int, objectref: Any, name: Union[str, int, Expression], params: List[Any]) -> None:
-        self.insertion_ref = insertion_ref
-        self.objectref = objectref
-        self.name = name
-        self.params = params
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        try:
-            obj = object_ref(self.objectref, parent_prefix, verbose=verbose)
-            name = name_ref(self.name, parent_prefix, verbose=verbose)
-            params = [value_ref(param, parent_prefix, verbose=verbose) for param in self.params]
-            return f"{obj}.{name}({', '.join(params)})"
-        except Exception:
-            obj = object_ref(self.objectref, parent_prefix, verbose=verbose)
-            name = value_ref(self.name, parent_prefix, verbose=verbose)
-            params = [value_ref(param, parent_prefix, verbose=verbose) for param in self.params]
-            return f"{obj}[{name}]({', '.join(params)})"
-
-
-class NewFunction(Expression):
-    # Create a new function.
-    def __init__(self, flags: int, body: ByteCode) -> None:
-        self.flags = flags
-        self.body = body
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        # This feels somewhat like a hack, but the bytecode inside the function definition
-        # *is* independent of the bytecode in this function, except for the shared string table.
-        decompiler = ByteCodeDecompiler(self.body)
-        decompiler.decompile(verbose=verbose)
-        code = decompiler.as_string(prefix=parent_prefix + "    ", verbose=verbose)
-
-        opar = '{'
-        cpar = '}'
-        val = f"new Function({hex(self.flags)}, {opar}{os.linesep}{code}{os.linesep}{parent_prefix}{cpar})"
-        if nested:
-            return f"({val})"
-        else:
-            return val
-
-
-class NewObject(Expression):
-    # Create a new object of type.
-    def __init__(self, objname: Union[str, StringConstant], params: List[Any]) -> None:
-        self.objname = objname
-        self.params = params
-
-    def __repr__(self) -> str:
-        return self.render('')
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        objname = name_ref(self.objname, parent_prefix, verbose=verbose)
-        params = [value_ref(param, parent_prefix, verbose=verbose) for param in self.params]
-        val = f"new {objname}({', '.join(params)})"
-        if nested:
-            return f"({val})"
-        else:
-            return val
-
-
-class SetMemberStatement(Statement):
-    # Call a method on an object.
-    def __init__(self, objectref: Any, name: Union[str, int, Expression], valueref: Any) -> None:
-        self.objectref = objectref
-        self.name = name
-        self.valueref = valueref
-
-    def code_equiv(self) -> str:
-        try:
-            ref = object_ref(self.objectref, "")
-            name = name_ref(self.name, "")
-            return f"{ref}.{name}"
-        except Exception:
-            # This is not a simple string object reference.
-            ref = object_ref(self.objectref, "")
-            name = value_ref(self.name, "")
-            return f"{ref}[{name}]"
-
-    def __repr__(self) -> str:
-        try:
-            ref = object_ref(self.objectref, "")
-            name = name_ref(self.name, "")
-            val = value_ref(self.valueref, "")
-            return f"{ref}.{name} = {val}"
-        except Exception:
-            # This is not a simple string object reference.
-            ref = object_ref(self.objectref, "")
-            name = value_ref(self.name, "")
-            val = value_ref(self.valueref, "")
-            return f"{ref}[{name}] = {val}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        try:
-            ref = object_ref(self.objectref, prefix, verbose=verbose)
-            name = name_ref(self.name, prefix, verbose=verbose)
-            val = value_ref(self.valueref, prefix, verbose=verbose)
-            return [f"{prefix}{ref}.{name} = {val};"]
-        except Exception:
-            # This is not a simple string object reference.
-            ref = object_ref(self.objectref, prefix, verbose=verbose)
-            name = value_ref(self.name, prefix, verbose=verbose)
-            val = value_ref(self.valueref, prefix, verbose=verbose)
-            return [f"{prefix}{ref}[{name}] = {val};"]
-
-
-class DeleteVariableStatement(Statement):
-    # Call a method on an object.
-    def __init__(self, name: Union[str, StringConstant]) -> None:
-        self.name = name
-
-    def __repr__(self) -> str:
-        name = name_ref(self.name, "")
-        return f"del {name}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        name = name_ref(self.name, prefix, verbose=verbose)
-        return [f"{prefix}del {name};"]
-
-
-class DeleteMemberStatement(Statement):
-    # Call a method on an object.
-    def __init__(self, objectref: Any, name: Union[str, int, Expression]) -> None:
-        self.objectref = objectref
-        self.name = name
-
-    def __repr__(self) -> str:
-        try:
-            ref = object_ref(self.objectref, "")
-            name = name_ref(self.name, "")
-            return f"del {ref}.{name}"
-        except Exception:
-            # This is not a simple string object reference.
-            ref = object_ref(self.objectref, "")
-            name = value_ref(self.name, "")
-            return f"del {ref}[{name}]"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        try:
-            ref = object_ref(self.objectref, prefix, verbose=verbose)
-            name = name_ref(self.name, prefix, verbose=verbose)
-            return [f"{prefix}del {ref}.{name};"]
-        except Exception:
-            # This is not a simple string object reference.
-            ref = object_ref(self.objectref, prefix, verbose=verbose)
-            name = value_ref(self.name, prefix, verbose=verbose)
-            return [f"{prefix}del {ref}[{name}];"]
-
-
-class StoreRegisterStatement(Statement):
-    # Set a variable to a value.
-    def __init__(self, register: Register, valueref: Any) -> None:
-        self.register = register
-        self.valueref = valueref
-
-    def code_equiv(self) -> str:
-        return self.register.render('')
-
-    def __repr__(self) -> str:
-        val = value_ref(self.valueref, "")
-        return f"{self.register.render('')} = {val}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        val = value_ref(self.valueref, prefix, verbose=verbose)
-        return [f"{prefix}{self.register.render(prefix, verbose=verbose)} = {val};"]
-
-
-class SetVariableStatement(Statement):
-    # Set a variable to a value.
-    def __init__(self, name: Union[str, StringConstant], valueref: Any) -> None:
-        self.name = name
-        self.valueref = valueref
-
-    def code_equiv(self) -> str:
-        return name_ref(self.name, "")
-
-    def __repr__(self) -> str:
-        name = name_ref(self.name, "")
-        val = value_ref(self.valueref, "")
-        return f"{name} = {val}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        name = name_ref(self.name, prefix, verbose=verbose)
-        val = value_ref(self.valueref, prefix, verbose=verbose)
-        return [f"{prefix}{name} = {val};"]
-
-
-class SetLocalStatement(Statement):
-    # Define a local variable with a value.
-    def __init__(self, name: Union[str, StringConstant], valueref: Any) -> None:
-        self.name = name
-        self.valueref = valueref
-
-    def code_equiv(self) -> str:
-        return name_ref(self.name, "")
-
-    def __repr__(self) -> str:
-        name = name_ref(self.name, "")
-        val = value_ref(self.valueref, "")
-        return f"local {name} = {val}"
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        name = name_ref(self.name, prefix, verbose=verbose)
-        val = value_ref(self.valueref, prefix, verbose=verbose)
-        return [f"{prefix}local {name} = {val};"]
-
-
-class IfExpr(ConvertedAction):
-    # This is just for typing.
-    def invert(self) -> "IfExpr":
-        raise NotImplementedError("Not implemented!")
-
-    def swap(self) -> "IfExpr":
-        raise NotImplementedError("Not implemented!")
-
-
-class IsUndefinedIf(IfExpr):
-    def __init__(self, conditional: Any, negate: bool) -> None:
-        self.conditional = conditional
-        self.negate = negate
-
-    def invert(self) -> "IsUndefinedIf":
-        return IsUndefinedIf(self.conditional, not self.negate)
-
-    def swap(self) -> "IsUndefinedIf":
-        return IsUndefinedIf(self.conditional, self.negate)
-
-    def __repr__(self) -> str:
-        val = value_ref(self.conditional, "", parens=True)
-        if self.negate:
-            return f"{val} is not UNDEFINED"
-        else:
-            return f"{val} is UNDEFINED"
-
-
-class IsBooleanIf(IfExpr):
-    def __init__(self, conditional: Any, negate: bool) -> None:
-        self.conditional = conditional
-        self.negate = negate
-
-    def invert(self) -> "IsBooleanIf":
-        return IsBooleanIf(self.conditional, not self.negate)
-
-    def swap(self) -> "IsBooleanIf":
-        return IsBooleanIf(self.conditional, self.negate)
-
-    def __repr__(self) -> str:
-        val = value_ref(self.conditional, "", parens=True)
-        if self.negate:
-            return f"not {val}"
-        else:
-            return f"{val}"
-
-
-class TwoParameterIf(IfExpr):
-    EQUALS = "=="
-    NOT_EQUALS = "!="
-    LT = "<"
-    GT = ">"
-    LT_EQUALS = "<="
-    GT_EQUALS = ">="
-    STRICT_EQUALS = "==="
-    STRICT_NOT_EQUALS = "!=="
-
-    def __init__(self, conditional1: Any, comp: str, conditional2: Any) -> None:
-        if comp not in {
-            self.EQUALS,
-            self.NOT_EQUALS,
-            self.LT,
-            self.GT,
-            self.LT_EQUALS,
-            self.GT_EQUALS,
-            self.STRICT_EQUALS,
-            self.STRICT_NOT_EQUALS,
-        }:
-            raise Exception(f"Invalid comparision {comp}!")
-
-        self.conditional1 = conditional1
-        self.comp = comp
-        self.conditional2 = conditional2
-
-    def invert(self) -> "TwoParameterIf":
-        if self.comp == self.EQUALS:
-            return TwoParameterIf(self.conditional1, self.NOT_EQUALS, self.conditional2)
-        if self.comp == self.NOT_EQUALS:
-            return TwoParameterIf(self.conditional1, self.EQUALS, self.conditional2)
-        if self.comp == self.LT:
-            return TwoParameterIf(self.conditional1, self.GT_EQUALS, self.conditional2)
-        if self.comp == self.GT:
-            return TwoParameterIf(self.conditional1, self.LT_EQUALS, self.conditional2)
-        if self.comp == self.LT_EQUALS:
-            return TwoParameterIf(self.conditional1, self.GT, self.conditional2)
-        if self.comp == self.GT_EQUALS:
-            return TwoParameterIf(self.conditional1, self.LT, self.conditional2)
-        if self.comp == self.STRICT_EQUALS:
-            return TwoParameterIf(self.conditional1, self.STRICT_NOT_EQUALS, self.conditional2)
-        if self.comp == self.STRICT_NOT_EQUALS:
-            return TwoParameterIf(self.conditional1, self.STRICT_EQUALS, self.conditional2)
-        raise Exception(f"Cannot invert {self.comp}!")
-
-    def swap(self) -> "TwoParameterIf":
-        if self.comp == self.EQUALS:
-            return TwoParameterIf(self.conditional2, self.EQUALS, self.conditional1)
-        if self.comp == self.NOT_EQUALS:
-            return TwoParameterIf(self.conditional2, self.NOT_EQUALS, self.conditional1)
-        if self.comp == self.LT:
-            return TwoParameterIf(self.conditional2, self.GT, self.conditional1)
-        if self.comp == self.GT:
-            return TwoParameterIf(self.conditional2, self.LT, self.conditional1)
-        if self.comp == self.LT_EQUALS:
-            return TwoParameterIf(self.conditional2, self.GT_EQUALS, self.conditional1)
-        if self.comp == self.GT_EQUALS:
-            return TwoParameterIf(self.conditional2, self.LT_EQUALS, self.conditional1)
-        if self.comp == self.STRICT_EQUALS:
-            return TwoParameterIf(self.conditional2, self.STRICT_EQUALS, self.conditional1)
-        if self.comp == self.STRICT_NOT_EQUALS:
-            return TwoParameterIf(self.conditional2, self.STRICT_NOT_EQUALS, self.conditional1)
-        raise Exception(f"Cannot swap {self.comp}!")
-
-    def __repr__(self) -> str:
-        val1 = value_ref(self.conditional1, "", parens=True)
-        val2 = value_ref(self.conditional2, "", parens=True)
-        return f"{val1} {self.comp} {val2}"
-
-
-class IfStatement(Statement):
-    def __init__(self, cond: IfExpr, true_statements: Sequence[Statement], false_statements: Sequence[Statement]) -> None:
-        self.cond = cond
-        self.true_statements = list(true_statements)
-        self.false_statements = list(false_statements)
-
-    def __repr__(self) -> str:
-        true_entries: List[str] = []
-        for statement in self.true_statements:
-            true_entries.extend([f"  {s}" for s in str(statement).split(os.linesep)])
-
-        false_entries: List[str] = []
-        for statement in self.false_statements:
-            false_entries.extend([f"  {s}" for s in str(statement).split(os.linesep)])
-
-        if false_entries:
-            return os.linesep.join([
-                f"if ({self.cond}) {{",
-                os.linesep.join(true_entries),
-                "} else {",
-                os.linesep.join(false_entries),
-                "}"
-            ])
-        else:
-            return os.linesep.join([
-                f"if ({self.cond}) {{",
-                os.linesep.join(true_entries),
-                "}"
-            ])
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        true_entries: List[str] = []
-        for statement in self.true_statements:
-            true_entries.extend(statement.render(prefix=prefix + "    ", verbose=verbose))
-
-        false_entries: List[str] = []
-        for statement in self.false_statements:
-            false_entries.extend(statement.render(prefix=prefix + "    ", verbose=verbose))
-
-        if false_entries:
-            return [
-                f"{prefix}if ({self.cond})",
-                f"{prefix}{{",
-                *true_entries,
-                f"{prefix}}}",
-                f"{prefix}else",
-                f"{prefix}{{",
-                *false_entries,
-                f"{prefix}}}"
-            ]
-        else:
-            return [
-                f"{prefix}if ({self.cond})",
-                f"{prefix}{{",
-                *true_entries,
-                f"{prefix}}}"
-            ]
-
-
-class DoWhileStatement(Statement):
-    def __init__(self, body: Sequence[Statement]) -> None:
-        self.body = list(body)
-
-    def __repr__(self) -> str:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend([f"  {s}" for s in str(statement).split(os.linesep)])
-
-        return os.linesep.join([
-            "do {",
-            os.linesep.join(entries),
-            "} while (True)"
-        ])
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend(statement.render(prefix=prefix + "    ", verbose=verbose))
-
-        return [
-            f"{prefix}do",
-            f"{prefix}{{",
-            *entries,
-            f"{prefix}}}",
-            f"{prefix}while (True);",
-        ]
-
-
-class ForStatement(DoWhileStatement):
-    # Special case of a DoWhileStatement that tracks its own exit condition and increment.
-    def __init__(self, inc_variable: str, inc_init: Any, cond: IfExpr, inc_assign: Any, body: Sequence[Statement], local: bool = False) -> None:
-        super().__init__(body)
-        self.inc_variable = inc_variable
-        self.inc_init = inc_init
-        self.cond = cond
-        self.inc_assign = inc_assign
-        self.local = local
-
-    def __repr__(self) -> str:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend([f"  {s}" for s in str(statement).split(os.linesep)])
-
-        inc_init = value_ref(self.inc_init, "")
-        inc_assign = value_ref(self.inc_assign, "")
-        if self.local:
-            local = "local "
-        else:
-            local = ""
-
-        return os.linesep.join([
-            f"for ({local}{self.inc_variable} = {inc_init}; {self.cond}; {self.inc_variable} = {inc_assign}) {{",
-            os.linesep.join(entries),
-            "}"
-        ])
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend(statement.render(prefix=prefix + "    ", verbose=verbose))
-
-        inc_init = value_ref(self.inc_init, prefix, verbose=verbose)
-        inc_assign = value_ref(self.inc_assign, prefix, verbose=verbose)
-        if self.local:
-            local = "local "
-        else:
-            local = ""
-
-        return [
-            f"{prefix}for ({local}{self.inc_variable} = {inc_init}; {self.cond}; {self.inc_variable} = {inc_assign}) {{",
-            f"{prefix}{{",
-            *entries,
-            f"{prefix}}}",
-        ]
-
-
-class WhileStatement(DoWhileStatement):
-    # Special case of a DoWhileStatement that tracks its own exit condition.
-    def __init__(self, cond: IfExpr, body: Sequence[Statement]) -> None:
-        super().__init__(body)
-        self.cond = cond
-
-    def __repr__(self) -> str:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend([f"  {s}" for s in str(statement).split(os.linesep)])
-
-        return os.linesep.join([
-            f"while ({self.cond}) {{",
-            os.linesep.join(entries),
-            "}"
-        ])
-
-    def render(self, prefix: str, verbose: bool = False) -> List[str]:
-        entries: List[str] = []
-        for statement in self.body:
-            entries.extend(statement.render(prefix=prefix + "    ", verbose=verbose))
-
-        return [
-            f"{prefix}while ({self.cond}) {{",
-            f"{prefix}{{",
-            *entries,
-            f"{prefix}}}",
-        ]
 
 
 class IntermediateIf(ConvertedAction):
@@ -1144,30 +336,6 @@ class IfBody:
         )
 
 
-class Variable(Expression):
-    def __init__(self, name: Union[str, StringConstant]) -> None:
-        self.name = name
-
-    def __repr__(self) -> str:
-        return f"Variable({name_ref(self.name, '')})"
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        return name_ref(self.name, parent_prefix, verbose=verbose)
-
-
-class TempVariable(Expression):
-    # This is solely for recognizing when a stack which is being reconciled already has
-    # a variable.
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __repr__(self) -> str:
-        return f"TempVariable({self.name})"
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        return self.name
-
-
 class InsertionLocation(Statement):
     def __init__(self, location: int) -> None:
         self.location = location
@@ -1188,28 +356,6 @@ class OriginalCallLocation(Statement):
 
     def render(self, prefix: str, verbose: bool = False) -> List[str]:
         raise Exception("Logic error, an InsertionLocation should never make it to the render stage!")
-
-
-class Member(Expression):
-    # A member can be an array entry in an array, or an object member as accessed
-    # in array lookup syntax or dot notation.
-    def __init__(self, objectref: Any, member: Union[str, int, Expression]) -> None:
-        self.objectref = objectref
-        self.member = member
-
-    def __repr__(self) -> str:
-        return self.render("")
-
-    def render(self, parent_prefix: str, verbose: bool = False, nested: bool = False) -> str:
-        try:
-            member = name_ref(self.member, parent_prefix, verbose=verbose)
-            ref = object_ref(self.objectref, parent_prefix, verbose=verbose)
-            return f"{ref}.{member}"
-        except Exception:
-            # This is not a simple string object reference.
-            member = value_ref(self.member, parent_prefix, verbose=verbose)
-            ref = object_ref(self.objectref, parent_prefix, verbose=verbose)
-            return f"{ref}[{member}]"
 
 
 class BitVector:
@@ -1288,7 +434,7 @@ class ByteCodeDecompiler(VerboseOutput):
             raise Exception("Call decompile() first before retrieving statements!")
         return self.__statements
 
-    def __graph_control_flow(self, bytecode: ByteCode) -> Tuple[List[ByteCodeChunk], Dict[int, int]]:
+    def _graph_control_flow(self, bytecode: ByteCode) -> Tuple[List[ByteCodeChunk], Dict[int, int]]:
         # Start by assuming that the whole bytecode never directs flow. This is, confusingly,
         # indexed by AP2Action offset, not by actual bytecode offset, so we can avoid the
         # prickly problem of opcodes that take more than one byte in the data.
@@ -1537,6 +683,8 @@ class ByteCodeDecompiler(VerboseOutput):
             if not chunk.next_chunks:
                 num_end_chunks += 1
             if not chunk.previous_chunks:
+                if bytecode.start_offset is None:
+                    raise Exception("Logic error, expected a start offset for bytecode chunk, we shouldn't be decompiling empty bytecode!")
                 if chunk.id != offset_to_id[bytecode.start_offset]:
                     raise Exception(f"Start of graph found at ID {chunk.id} but expected to be {offset_to_id[bytecode.start_offset]}!")
                 num_start_chunks += 1
@@ -1725,7 +873,7 @@ class ByteCodeDecompiler(VerboseOutput):
 
                     chunk.actions[-1] = IntermediateIf(
                         cast(IfAction, last_action),
-                        [true_action],
+                        [true_action] if true_action else [],
                         [false_action] if false_action else [],
                     )
 
@@ -1974,7 +1122,7 @@ class ByteCodeDecompiler(VerboseOutput):
                         if true_action or false_action:
                             chunk.actions[-1] = IntermediateIf(
                                 cast(IfAction, last_action),
-                                [true_action],
+                                [true_action] if true_action else [],
                                 [false_action] if false_action else [],
                             )
 
@@ -2394,40 +1542,40 @@ class ByteCodeDecompiler(VerboseOutput):
         # into the spot where they were called since we know that they aren't used.
 
         def make_if_expr(action: IfAction) -> IfExpr:
-            if action.comparison in [IfAction.IS_UNDEFINED, IfAction.IS_NOT_UNDEFINED]:
+            if action.comparison in [IfAction.COMP_IS_UNDEFINED, IfAction.COMP_IS_NOT_UNDEFINED]:
                 conditional = stack.pop()
-                return IsUndefinedIf(conditional, negate=(action.comparison != IfAction.IS_UNDEFINED))
-            elif action.comparison in [IfAction.IS_TRUE, IfAction.IS_FALSE]:
+                return IsUndefinedIf(conditional, negate=(action.comparison != IfAction.COMP_IS_UNDEFINED))
+            elif action.comparison in [IfAction.COMP_IS_TRUE, IfAction.COMP_IS_FALSE]:
                 conditional = stack.pop()
-                return IsBooleanIf(conditional, negate=(action.comparison != IfAction.IS_TRUE))
+                return IsBooleanIf(conditional, negate=(action.comparison != IfAction.COMP_IS_TRUE))
             elif action.comparison in [
-                IfAction.EQUALS,
-                IfAction.NOT_EQUALS,
-                IfAction.STRICT_EQUALS,
-                IfAction.STRICT_NOT_EQUALS,
-                IfAction.LT,
-                IfAction.GT,
-                IfAction.LT_EQUALS,
-                IfAction.GT_EQUALS
+                IfAction.COMP_EQUALS,
+                IfAction.COMP_NOT_EQUALS,
+                IfAction.COMP_STRICT_EQUALS,
+                IfAction.COMP_STRICT_NOT_EQUALS,
+                IfAction.COMP_LT,
+                IfAction.COMP_GT,
+                IfAction.COMP_LT_EQUALS,
+                IfAction.COMP_GT_EQUALS
             ]:
                 conditional2 = stack.pop()
                 conditional1 = stack.pop()
                 comp = {
-                    IfAction.EQUALS: TwoParameterIf.EQUALS,
-                    IfAction.NOT_EQUALS: TwoParameterIf.NOT_EQUALS,
-                    IfAction.STRICT_EQUALS: TwoParameterIf.STRICT_EQUALS,
-                    IfAction.STRICT_NOT_EQUALS: TwoParameterIf.STRICT_NOT_EQUALS,
-                    IfAction.LT: TwoParameterIf.LT,
-                    IfAction.GT: TwoParameterIf.GT,
-                    IfAction.LT_EQUALS: TwoParameterIf.LT_EQUALS,
-                    IfAction.GT_EQUALS: TwoParameterIf.GT_EQUALS,
+                    IfAction.COMP_EQUALS: TwoParameterIf.EQUALS,
+                    IfAction.COMP_NOT_EQUALS: TwoParameterIf.NOT_EQUALS,
+                    IfAction.COMP_STRICT_EQUALS: TwoParameterIf.STRICT_EQUALS,
+                    IfAction.COMP_STRICT_NOT_EQUALS: TwoParameterIf.STRICT_NOT_EQUALS,
+                    IfAction.COMP_LT: TwoParameterIf.LT,
+                    IfAction.COMP_GT: TwoParameterIf.GT,
+                    IfAction.COMP_LT_EQUALS: TwoParameterIf.LT_EQUALS,
+                    IfAction.COMP_GT_EQUALS: TwoParameterIf.GT_EQUALS,
                 }[action.comparison]
 
                 return TwoParameterIf(conditional1, comp, conditional2)
-            elif action.comparison in [IfAction.BITAND, IfAction.NOT_BITAND]:
+            elif action.comparison in [IfAction.COMP_BITAND, IfAction.COMP_NOT_BITAND]:
                 conditional2 = stack.pop()
                 conditional1 = stack.pop()
-                comp = TwoParameterIf.NOT_EQUALS if action.comparison == IfAction.BITAND else TwoParameterIf.EQUALS
+                comp = TwoParameterIf.NOT_EQUALS if action.comparison == IfAction.COMP_BITAND else TwoParameterIf.EQUALS
 
                 return TwoParameterIf(
                     ArithmeticExpression(conditional1, "&", conditional2),
@@ -2448,12 +1596,15 @@ class ByteCodeDecompiler(VerboseOutput):
                 continue
 
             if isinstance(action, DefineFunction2Action):
+                decompiler = ByteCodeDecompiler(action.body)
+                decompiler.decompile(verbose=self.verbose)
+
                 if action.name:
                     # This defines a global function, so it won't go on the stack.
-                    chunk.actions[i] = SetVariableStatement(action.name, NewFunction(action.flags, action.body))
+                    chunk.actions[i] = SetVariableStatement(action.name, NewFunction(action.flags, decompiler))
                 else:
                     # This defines a function object, most likely for attaching to a member of an object.
-                    stack.append(NewFunction(action.flags, action.body))
+                    stack.append(NewFunction(action.flags, decompiler))
                     chunk.actions[i] = NopStatement()
 
                 continue
@@ -3236,10 +2387,7 @@ class ByteCodeDecompiler(VerboseOutput):
             if len(chunk.next_chunks) > 1:
                 # We've checked so this should be impossible.
                 raise Exception("Logic error!")
-            if chunk.next_chunks:
-                next_chunk_id = chunk.next_chunks[0]
-            else:
-                next_chunk_id = next_id
+            next_chunk_id = chunk.next_chunks[0] if chunk.next_chunks else next_id
 
             if isinstance(chunk, Loop):
                 # Evaluate the loop. No need to update per-chunk stacks here since we will do it in a child eval.
@@ -3321,6 +2469,8 @@ class ByteCodeDecompiler(VerboseOutput):
                             offset_map,
                         )
                     else:
+                        if next_chunk_id is None:
+                            raise Exception("Logic error, cannot reconcile stacks when next chunk is the end!")
                         reconcile_stacks(chunk.id, next_chunk_id, stack_leftovers)
 
                     false_statements: List[Statement] = []
@@ -3345,6 +2495,8 @@ class ByteCodeDecompiler(VerboseOutput):
                             offset_map,
                         )
                     else:
+                        if next_chunk_id is None:
+                            raise Exception("Logic error, cannot reconcile stacks when next chunk is the end!")
                         reconcile_stacks(chunk.id, next_chunk_id, stack_leftovers)
 
                     # Convert this IfExpr to a full-blown IfStatement.
@@ -3358,7 +2510,7 @@ class ByteCodeDecompiler(VerboseOutput):
                     chunk = if_body_chunk
                 else:
                     # We must propagate the stack to the next entry. If it already exists we must merge it.
-                    new_next_ids: Set[int] = {next_chunk_id}
+                    new_next_ids: Set[int] = {next_chunk_id} if next_chunk_id else set()
                     if new_statements:
                         last_new_statement = new_statements[-1]
                         if isinstance(last_new_statement, GotoStatement):
@@ -3606,7 +2758,7 @@ class ByteCodeDecompiler(VerboseOutput):
 
         updated: bool = False
 
-        def remove_returns(statement: Statement) -> Statement:
+        def remove_returns(statement: Statement) -> Optional[Statement]:
             nonlocal updated
 
             for removable in returns:
@@ -3728,7 +2880,7 @@ class ByteCodeDecompiler(VerboseOutput):
 
         updated: bool = False
 
-        def remove_continues(statement: Statement) -> Statement:
+        def remove_continues(statement: Statement) -> Optional[Statement]:
             nonlocal updated
 
             for removable in continues:
@@ -3746,14 +2898,17 @@ class ByteCodeDecompiler(VerboseOutput):
             if expression.op in {"+", "-", "*", "/"}:
                 # It is, let's see if one of the two sides contains the
                 # variable we care about.
+                left = None
                 try:
                     left = object_ref(expression.left, "")
                 except Exception:
-                    left = None
+                    pass
+
+                right = None
                 try:
                     right = object_ref(expression.right, "")
                 except Exception:
-                    right = None
+                    pass
 
                 return left == variable or right == variable
         return False
@@ -3794,35 +2949,39 @@ class ByteCodeDecompiler(VerboseOutput):
                 # This is possibly a candidate, check the condition's variable usage.
                 if isinstance(possible_if.cond, IsUndefinedIf):
                     if required_variable is not None:
+                        if_variable = None
                         try:
                             if_variable = object_ref(possible_if.cond.conditional, "")
                         except Exception:
-                            if_variable = None
+                            pass
                         if required_variable != if_variable:
-                            return None
+                            return None, []
                     return possible_if.cond, possible_if.false_statements
                 elif isinstance(possible_if.cond, IsBooleanIf):
                     if required_variable is not None:
+                        if_variable = None
                         try:
                             if_variable = object_ref(possible_if.cond.conditional, "")
                         except Exception:
-                            if_variable = None
+                            pass
                         if required_variable != if_variable:
-                            return None
+                            return None, []
                     return possible_if.cond, possible_if.false_statements
                 elif isinstance(possible_if.cond, TwoParameterIf):
                     if required_variable is not None:
+                        if_variable1 = None
                         try:
                             if_variable1 = object_ref(possible_if.cond.conditional1, "")
                         except Exception:
-                            if_variable1 = None
+                            pass
                         if if_variable1 == required_variable:
                             return possible_if.cond, possible_if.false_statements
 
+                        if_variable2 = None
                         try:
                             if_variable2 = object_ref(possible_if.cond.conditional2, "")
                         except Exception:
-                            if_variable2 = None
+                            pass
                         if if_variable2 == required_variable:
                             return possible_if.cond.swap(), possible_if.false_statements
                     return possible_if.cond, possible_if.false_statements
@@ -4073,14 +3232,16 @@ class ByteCodeDecompiler(VerboseOutput):
         output: List[str] = []
 
         for statement in statements:
-            output.extend(statement.render(prefix, verbose=self.verbose))
+            output.extend(statement.render(prefix))
 
         return os.linesep.join(output)
 
     def __decompile(self) -> None:
         # First, we need to construct a control flow graph.
         self.vprint("Generating control flow graph...")
-        chunks, offset_map = self.__graph_control_flow(self.bytecode)
+        chunks, offset_map = self._graph_control_flow(self.bytecode)
+        if self.bytecode.start_offset is None:
+            raise Exception("Logic error, we should not be decompiling empty bytecode!")
         start_id = offset_map[self.bytecode.start_offset]
 
         # Now, compute dominators so we can locate back-refs.

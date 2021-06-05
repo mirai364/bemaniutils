@@ -1,5 +1,5 @@
 import struct
-from typing import Optional, List, Dict, Any
+from typing import Optional, Final, List, Dict, Any
 
 from bemani.protocol.stream import InputStream, OutputStream
 from bemani.protocol.node import Node
@@ -51,7 +51,7 @@ class PackedOrdering:
             size - Number of bytes to work with as an integer
             allow_expansion - Boolean describing whether to add to the end of the order when needed
         """
-        self.order: List[int] = []
+        self.order: List[Optional[int]] = []
         self.expand = allow_expansion
 
         for i in range(size):
@@ -269,6 +269,8 @@ class BinaryDecoder:
             A string representing the name in ascii
         """
         length = self.stream.read_int()
+        if length is None:
+            raise BinaryEncodingException("Ran out of data when attempting to read node name length!")
         binary_length = int(((length * 6) + 7) / 8)
 
         def int_to_bin(integer: int) -> str:
@@ -280,7 +282,10 @@ class BinaryDecoder:
 
         data = ''
         for i in range(binary_length):
-            data = data + int_to_bin(self.stream.read_int())
+            next_byte = self.stream.read_int()
+            if next_byte is None:
+                raise BinaryEncodingException("Ran out of data when attempting to read node name!")
+            data = data + int_to_bin(next_byte)
         data_str = [data[i:(i + 6)] for i in range(0, len(data), 6)]
         data_int = [int(val, 2) for val in data_str]
         ret = ''.join([Node.NODE_NAME_CHARS[val] for val in data_int])
@@ -301,6 +306,8 @@ class BinaryDecoder:
 
         while True:
             child_type = self.stream.read_int()
+            if child_type is None:
+                raise BinaryEncodingException("Ran out of data when attempting to read node type!")
 
             if child_type == Node.END_OF_NODE:
                 return node
@@ -320,13 +327,18 @@ class BinaryDecoder:
             Node object
         """
         if self.executed:
-            raise Exception("Logic error, should only call this once per instance")
+            raise BinaryEncodingException("Logic error, should only call this once per instance")
         self.executed = True
 
         # Read the header first
         header_length = self.stream.read_int(4)
+        if header_length is None:
+            raise BinaryEncodingException("Ran out of data when attempting to read header length!")
 
-        root = self.__read_node(self.stream.read_int())
+        node_type = self.stream.read_int()
+        if node_type is None:
+            raise BinaryEncodingException("Ran out of data when attempting to read root node type!")
+        root = self.__read_node(node_type)
 
         eod = self.stream.read_int()
         if eod != Node.END_OF_DOCUMENT:
@@ -378,6 +390,8 @@ class BinaryDecoder:
                         loc = ordering.get_next_short()
                     elif alignment == 4:
                         loc = ordering.get_next_int()
+                    if loc is None:
+                        raise BinaryEncodingException("Ran out of data when attempting to read node data location!")
 
                     if size is None:
                         # The size should be read from the first 4 bytes
@@ -419,6 +433,8 @@ class BinaryDecoder:
                 else:
                     # Array value
                     loc = ordering.get_next_int()
+                    if loc is None:
+                        raise BinaryEncodingException("Ran out of data when attempting to read array length location!")
 
                     # The raw size in bytes
                     length = struct.unpack('>I', body[loc:(loc + 4)])[0]
@@ -602,6 +618,8 @@ class BinaryEncoder:
                         loc = ordering.get_next_short()
                     elif alignment == 4:
                         loc = ordering.get_next_int()
+                    if loc is None:
+                        raise BinaryEncodingException("Ran out of data when attempting to allocate node location!")
 
                     if dtype == 'str':
                         # Need to convert this to encoding from standard string.
@@ -633,6 +651,9 @@ class BinaryEncoder:
                         continue
                     elif composite:
                         # Array, but not, somewhat silly
+                        if size is None:
+                            raise Exception("Logic error, node size not set yet this is not an attribute!")
+
                         encode_value = f'>{enc}'
                         self.__add_data(struct.pack(encode_value, *val), size, loc)
                         ordering.mark_used(size, loc)
@@ -643,12 +664,19 @@ class BinaryEncoder:
                         val = 1 if val else 0
 
                     # The size is built-in, emit it
+                    if size is None:
+                        raise Exception("Logic error, node size not set yet this is not an attribute!")
+
                     encode_value = f'>{enc}'
                     self.__add_data(struct.pack(encode_value, val), size, loc)
                     ordering.mark_used(size, loc)
                 else:
                     # Array value
                     loc = ordering.get_next_int()
+                    if loc is None:
+                        raise BinaryEncodingException("Ran out of data when attempting allocate array location!")
+                    if size is None:
+                        raise Exception("Logic error, node size not set yet this is not an attribute!")
 
                     # The raw size in bytes
                     elems = len(val)
@@ -680,17 +708,17 @@ class BinaryEncoding:
     """
     Wrapper class representing a Binary Encoding.
     """
-    MAGIC = 0xA0
+    MAGIC: Final[int] = 0xA0
 
-    COMPRESSED_WITH_DATA = 0x42
-    COMPRESSED_WITHOUT_DATA = 0x43
-    DECOMPRESSED_WITH_DATA = 0x45
-    DECOMPRESSED_WITHOUT_DATA = 0x46
+    COMPRESSED_WITH_DATA: Final[int] = 0x42
+    COMPRESSED_WITHOUT_DATA: Final[int] = 0x43
+    DECOMPRESSED_WITH_DATA: Final[int] = 0x45
+    DECOMPRESSED_WITHOUT_DATA: Final[int] = 0x46
 
     # The string values should match the constants in EAmuseProtocol.
     # I have no better way to link these than to write this comment,
     # as otherwise we would have a circular dependency.
-    ENCODINGS = {
+    ENCODINGS: Final[Dict[int, str]] = {
         0x00: "ascii",
         0x20: "shift-jis-legacy",
         0x60: "euc-jp",
@@ -760,7 +788,7 @@ class BinaryEncoding:
         else:
             return None
 
-    def encode(self, tree: Node, encoding: str=None) -> bytes:
+    def encode(self, tree: Node, encoding: Optional[str]=None) -> bytes:
         """
         Given a tree of Node objects, encode the data with the current encoding.
 
